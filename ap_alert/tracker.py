@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import json
+import logging
 import os
 import cattrs
 from interactions import (
@@ -250,10 +251,10 @@ class APTracker(Extension):
         to_delete = []
         for room_id, multiwold in self.cheese.items():
             if multiwold.last_update and datetime.datetime.now(tz=multiwold.last_update.tzinfo) - multiwold.last_update > datetime.timedelta(days=7):
-                print(f"Removing {room_id} from cheese trackers")
+                logging.info(f"Removing {room_id} from cheese trackers")
                 to_delete.append(room_id)
-            elif multiwold.last_update is None and datetime.datetime.now(tz=datetime.timezone.utc) - multiwold.last_check > datetime.timedelta(days=30):
-                print(f"Removing {room_id} from cheese trackers")
+            elif multiwold.last_update is None and datetime.datetime.now() - multiwold.last_check > datetime.timedelta(days=30):
+                logging.info(f"Removing {room_id} from cheese trackers")
                 to_delete.append(room_id)
 
         for room_id in to_delete:

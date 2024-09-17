@@ -1,5 +1,6 @@
 import os
 import subprocess
+import logging
 
 from interactions.models.internal.tasks import Task, IntervalTrigger
 
@@ -29,16 +30,16 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
     if not os.path.exists("zoggoth_repo"):
         clone_repo()
     if not os.path.exists(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")):
-        print(f"Datapackage {name} not found in Zoggoth's repo.")
+        logging.info(f"Datapackage {name} not found in Zoggoth's repo.")
         return
     with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")) as f:
         for line in f:
             key, value = line.split(": ")
             value = value.strip().lower()
             if value == "unknown":
-                print(f"Zoggoth doesn't know the classification for item {key} in {name}.")
+                logging.info(f"Zoggoth doesn't know the classification for item {key} in {name}.")
                 continue
             elif value in classifications:
                 dp.items[key] = classifications[value]
             else:
-                print(f"Unknown classification `{value}` for item {key} in {name}.")
+                logging.error(f"Unknown classification `{value}` for item {key} in {name}.")
