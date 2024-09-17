@@ -42,6 +42,8 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
 
     with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")) as f:
         for line in f:
+            if not line.strip():
+                continue
             key, value = line.split(": ")
             value = value.strip().lower()
             to_append.discard(key)
