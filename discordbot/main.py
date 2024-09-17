@@ -13,7 +13,7 @@ if sys.platform == "win32":
 class Bot(interactions.Client):
     def __init__(self) -> None:
         super().__init__(
-            intents=interactions.Intents.DEFAULT | interactions.Intents.MESSAGE_CONTENT,
+            intents=interactions.Intents.DEFAULT,
             enable_emoji_cache=True,
             sync_interactions=True,
             sync_ext=True,
