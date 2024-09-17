@@ -27,6 +27,7 @@ def update_all(dps: dict[str, Datapackage]) -> None:
         load_datapackage(name, dp)
 
 def load_datapackage(name: str, dp: Datapackage) -> None:
+    logging.info(f"Loading datapackage {name}")
     if not os.path.exists("zoggoth_repo"):
         clone_repo()
     if not os.path.exists(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")):
@@ -44,8 +45,10 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
         for line in f:
             if not line.strip():
                 continue
-            key, value = line.split(": ")
-            value = value.strip().lower()
+            splits = line.split(": ")
+            key = ":".join(splits[:-1])
+            value = splits[-1].strip().lower()
+
             to_append.discard(key)
             if value == "unknown":
                 logging.info(f"Zoggoth doesn't know the classification for item {key} in {name}.")
