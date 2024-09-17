@@ -31,11 +31,18 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
         clone_repo()
     if not os.path.exists(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")):
         logging.info(f"Datapackage {name} not found in Zoggoth's repo.")
-        return
+        os.makedirs(os.path.join("zoggoth_repo", "worlds", name), exist_ok=True)
+        with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "w") as f:
+            f.write("")
+
+    to_append = set(dp.items.keys())
+    to_append.discard("Rollback detected!")
+
     with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")) as f:
         for line in f:
             key, value = line.split(": ")
             value = value.strip().lower()
+            to_append.discard(key)
             if value == "unknown":
                 logging.info(f"Zoggoth doesn't know the classification for item {key} in {name}.")
                 continue
@@ -43,3 +50,11 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
                 dp.items[key] = classifications[value]
             else:
                 logging.error(f"Unknown classification `{value}` for item {key} in {name}.")
+
+    if to_append:
+        with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "a") as f:
+            for item in to_append:
+                v = repr(dp.items[item]).split(".")[1].split(':')[0]
+                if v == "unknown":
+                    continue
+                f.write(f"{item}: {v}\n")
