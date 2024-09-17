@@ -38,6 +38,8 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
     to_append = set(dp.items.keys())
     to_append.discard("Rollback detected!")
 
+    trailing_newline = False
+
     with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")) as f:
         for line in f:
             key, value = line.split(": ")
@@ -50,9 +52,12 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
                 dp.items[key] = classifications[value]
             else:
                 logging.error(f"Unknown classification `{value}` for item {key} in {name}.")
+            trailing_newline = line.endswith("\n")
 
     if to_append:
         with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "a") as f:
+            if not trailing_newline:
+                f.write("\n")
             for item in to_append:
                 v = repr(dp.items[item]).split(".")[1].split(':')[0]
                 if v == "unknown":
