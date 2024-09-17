@@ -66,11 +66,17 @@ class TrackedGame:
         return new_items
 
 
+class CheeseGame(dict):
+    @property
+    def last_activity(self) -> datetime.datetime:
+        return datetime.datetime.fromisoformat(self.get("last_activity", "1970-01-01T00:00:00Z"))
+
 @attrs.define()
 class Multiworld:
     url: str  # https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/room_id
+    tracker_id: str = None
     title: str = None
-    games: dict[int, dict] = None
+    games: dict[int, CheeseGame] = None
     last_check: datetime.datetime = None
     last_update: datetime.datetime = None
 
@@ -82,9 +88,13 @@ class Multiworld:
         logging.info(f"Refreshing {self.url}")
         data = requests.get(self.url).text
         data = json.loads(data)
+        self.tracker_id = data.get("tracker_id")
         self.title = data.get("title")
-        self.games = {g["position"]: g for g in data.get("games")}
+        self.games = {g["position"]: CheeseGame(g) for g in data.get("games")}
         self.last_update = datetime.datetime.fromisoformat(data.get("updated_at"))
+
+    def last_activity(self) -> datetime.datetime:
+        return max(g.last_activity for g in self.games.values())
 
 
 

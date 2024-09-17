@@ -31,6 +31,9 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
     if not os.path.exists("zoggoth_repo"):
         clone_repo()
     if not os.path.exists(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")):
+        if name == "None":
+            return
+
         logging.info(f"Datapackage {name} not found in Zoggoth's repo.")
         os.makedirs(os.path.join("zoggoth_repo", "worlds", name), exist_ok=True)
         with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "w") as f:
@@ -44,6 +47,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
     with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")) as f:
         for line in f:
             if not line.strip():
+                trailing_newline = True
                 continue
             splits = line.split(": ")
             key = ":".join(splits[:-1])

@@ -184,12 +184,15 @@ class APTracker(Extension):
                 .get("tracker_id")
             )
             multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
+
         await multiworld.refresh()
         self.cheese[room] = multiworld
         age = datetime.datetime.now(tz=datetime.timezone.utc) - multiworld.last_update
 
         for game in multiworld.games.values():
             game["url"] = f'https://archipelago.gg/tracker/{room}/0/{game["position"]}'
+            is_game_done = game["checks_done"] == game["checks_total"]
+            is_game_abandoned = multiworld.last_activity() < datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=21)
 
             for t in self.trackers.get(player.id, []):
                 if t.url == game["url"]:
@@ -198,12 +201,13 @@ class APTracker(Extension):
             else:
                 tracker = None
 
+
             if game.get("effective_discord_username") == player.username:
                 if player.id not in self.trackers:
                     self.trackers[player.id] = []
 
                 if tracker is None:
-                    if game["checks_done"] == game["checks_total"] or age > datetime.timedelta(days=1):
+                    if is_game_done or age > datetime.timedelta(days=1) or is_game_abandoned:
                         continue
 
                     tracker = TrackedGame(game["url"])
@@ -211,17 +215,23 @@ class APTracker(Extension):
                     self.save()
 
             if tracker:
-                if game["checks_done"] == game["checks_total"]:
-                    await player.send(f"Game {tracker.name} is complete")
-                    self.remove_tracker(player, game["url"])
-                    continue
-
                 if multiworld.title:
                     tracker.name = f"***{multiworld.title}*** - **{game['name']}**"
                 else:
                     tracker.name = f"{room} - **{game['name']}**"
                 tracker.game = game["game"]
-        return Multiworld
+
+                if is_game_done:
+                    await player.send(f"Game {tracker.name} is complete")
+                    self.remove_tracker(player, game["url"])
+                    continue
+
+                if is_game_abandoned:
+                    # await player.send(f"Game {tracker.name} has finished")
+                    self.remove_tracker(player, game["url"])
+                    continue
+
+        return multiworld
 
     def remove_tracker(self, player, url):
         for t in self.trackers[player.id]:
