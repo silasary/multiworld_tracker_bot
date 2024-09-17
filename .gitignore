@@ -1,0 +1,10 @@
+/.mypy_cache/
+/.vscode/
+config.json
+*.pyc
+/images/*.jpg
+
+.pytype
+/trackers.json
+/cheese.json
+/datapackages.json
