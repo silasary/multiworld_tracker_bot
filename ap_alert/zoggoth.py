@@ -18,6 +18,7 @@ def clone_repo() -> None:
     repo_url = "https://github.com/Zoggoth/Zoggoths-Archipelago-Multitracker.git"
     if os.path.exists("zoggoth_repo"):
         subprocess.run(["git", "reset", "--hard", "origin/main"], cwd="zoggoth_repo")
+        subprocess.run(["git", "pull"], cwd="zoggoth_repo")
     else:
         subprocess.run(["git", "clone", repo_url, "zoggoth_repo"])
 
@@ -31,7 +32,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
     if not os.path.exists("zoggoth_repo"):
         clone_repo()
     if not os.path.exists(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")):
-        if name == "None":
+        if name in ['None', 'null']:
             return
 
         logging.info(f"Datapackage {name} not found in Zoggoth's repo.")

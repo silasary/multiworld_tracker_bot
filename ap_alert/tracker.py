@@ -11,6 +11,7 @@ from interactions import (
     OptionType,
     SlashContext,
     User,
+    integration_types,
     listen,
     slash_option,
     slash_command,
@@ -45,6 +46,7 @@ class APTracker(Extension):
         # await zoggoth.update_datapackage()
 
     @slash_command("ap")
+    @integration_types(guild=True, user=True)
     async def ap(self, ctx: SlashContext) -> None:
         """Monitor for Archipelago games"""
 
