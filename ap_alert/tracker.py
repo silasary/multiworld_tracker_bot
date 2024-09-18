@@ -19,6 +19,7 @@ from interactions import (
 )
 from interactions.models.internal.tasks import Task, IntervalTrigger
 from interactions.ext.paginators import Paginator
+from interactions.client.errors import Forbidden
 import requests
 
 from .multiworld import Datapackage, TrackedGame, Multiworld, ItemClassification
@@ -251,13 +252,18 @@ class APTracker(Extension):
                 await self.sync_cheese(player, tracker.tracker_id)
                 new_items = tracker.refresh()
                 if not new_items and tracker.failures > 10:
-                    await player.send(f"Tracker {tracker.url} has been removed due to errors")
                     self.remove_tracker(player, tracker.url)
+                    await player.send(f"Tracker {tracker.url} has been removed due to errors")
                     continue
 
-                if new_items:
-                    await self.send_new_items(player, tracker, new_items)
-                    asyncio.create_task(self.try_classify(player, tracker, new_items))
+                try:
+                    if new_items:
+                        await self.send_new_items(player, tracker, new_items)
+                        asyncio.create_task(self.try_classify(player, tracker, new_items))
+                except Forbidden:
+                    logging.error(f"Failed to send message to {player.id}")
+                    tracker.failures += 1
+
                 await asyncio.sleep(60)
 
         to_delete = []
