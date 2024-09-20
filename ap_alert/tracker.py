@@ -130,6 +130,7 @@ class APTracker(Extension):
                 return
             await msg.channel.delete_message(msg)
             self.save()
+        zoggoth.load_datapackage(tracker.game, self.datapackages[tracker.game])
 
     async def send_new_items(
         self,
