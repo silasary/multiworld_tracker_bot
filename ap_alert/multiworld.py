@@ -38,7 +38,7 @@ class TrackedGame:
     def slot_id(self) -> str:
         return self.url.split("/")[-1]
 
-    def refresh(self) -> None:
+    def refresh(self) -> list[list[str]]:
         logging.info(f"Refreshing {self.url}")
         html = requests.get(self.url).content
         soup = BeautifulSoup(html, features="html.parser")

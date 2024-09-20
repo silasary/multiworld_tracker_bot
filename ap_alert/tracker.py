@@ -136,7 +136,7 @@ class APTracker(Extension):
         self,
         ctx_or_user: SlashContext | User,
         tracker: TrackedGame,
-        new_items: list[str],
+        new_items: list[list[str]],
     ):
         def icon(item):
             if tracker.game in self.datapackages and item in self.datapackages[tracker.game].items:
