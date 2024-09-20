@@ -78,8 +78,9 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
                 written = True
 
     if written:
-        subprocess.run(["git", "branch", "-f", name], cwd="zoggoth_repo")
-        subprocess.run(["git", "checkout", name], cwd="zoggoth_repo")
+        quoted_name = name.replace(" ", "_")
+        subprocess.run(["git", "branch", "-f", quoted_name], cwd="zoggoth_repo")
+        subprocess.run(["git", "checkout", quoted_name], cwd="zoggoth_repo")
         subprocess.run(["git", "add", f"worlds/{name}/progression.txt"], cwd="zoggoth_repo")
         subprocess.run(["git", "commit", "-m", f"Update {name} progression"], cwd="zoggoth_repo")
         subprocess.run(["git", "push", "--force", "-u", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
