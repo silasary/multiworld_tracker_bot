@@ -21,6 +21,7 @@ def clone_repo() -> None:
         subprocess.run(["git", "pull"], cwd="zoggoth_repo")
     else:
         subprocess.run(["git", "clone", repo_url, "zoggoth_repo"])
+        subprocess.run(["git", "remote", "add", "silasary", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
 
 def update_all(dps: dict[str, Datapackage]) -> None:
     """Update all datapackages."""
@@ -64,6 +65,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
                 logging.error(f"Unknown classification `{value}` for item {key} in {name}.")
             trailing_newline = line.endswith("\n")
 
+    written = False
     if to_append:
         with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "a") as f:
             if not trailing_newline:
@@ -73,3 +75,12 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
                 if v == "unknown":
                     continue
                 f.write(f"{item}: {v}\n")
+                written = True
+
+    if written:
+        subprocess.run(["git", "branch", "-f", name], cwd="zoggoth_repo")
+        subprocess.run(["git", "checkout", name], cwd="zoggoth_repo")
+        subprocess.run(["git", "add", f"worlds/{name}/progression.txt"], cwd="zoggoth_repo")
+        subprocess.run(["git", "commit", "-m", f"Update {name} progression"], cwd="zoggoth_repo")
+        subprocess.run(["git", "push", "--force", "-u", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
+        subprocess.run(["git", "checkout", "main"], cwd="zoggoth_repo")
