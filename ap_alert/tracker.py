@@ -196,6 +196,9 @@ class APTracker(Extension):
                 if t.url == game["url"]:
                     tracker = t
                     break
+                elif t.url == game["url"].replace('/tracker/', '/generic_tracker/'):
+                    tracker = t
+                    break
             else:
                 tracker = None
 
@@ -268,7 +271,12 @@ class APTracker(Extension):
             player = await self.bot.fetch_user(user)
             if not player:
                 continue
+            urls = set()
             for tracker in trackers:
+                if tracker.url in urls:
+                    tracker.failures += 1
+                    continue
+                urls.add(tracker.url)
                 await self.sync_cheese(player, tracker.tracker_id)
                 new_items = tracker.refresh()
                 if not new_items and tracker.failures > 10:
@@ -284,7 +292,7 @@ class APTracker(Extension):
                     logging.error(f"Failed to send message to {player.id}")
                     tracker.failures += 1
 
-                await asyncio.sleep(60)
+                await asyncio.sleep(30)
 
         to_delete = []
         for room_id, multiwold in self.cheese.items():
