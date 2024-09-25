@@ -70,13 +70,24 @@ class APTracker(Extension):
                 self.trackers[ctx.author_id].append(tracker)
                 self.save()
 
-            new_items = tracker.refresh()
-            await self.send_new_items(ctx, tracker, new_items)
+            room, multiworld = await self.url_to_multiworld('/'.join(url.split("/")[:-2]))
+            await multiworld.refresh()
+            slot = multiworld.games[int(url.split("/")[-1])]
+            tracker.game = slot["game"]
+            self.check_for_dp(tracker)
+
+            # tracker.name = f"{room} - **{slot['name']}**"
+            await self.ap_refresh(ctx)
         else:
             # Track cheese room
             await ctx.defer(ephemeral=True)
             await self.sync_cheese(ctx.author, url)
             await self.ap_refresh(ctx)
+
+    def check_for_dp(self, tracker):
+        if tracker.game not in self.datapackages:
+            self.datapackages[tracker.game] = Datapackage(items={})
+            zoggoth.load_datapackage(tracker.game, self.datapackages[tracker.game])
 
     @ap.subcommand("refresh")
     async def ap_refresh(self, ctx: SlashContext) -> None:
@@ -174,26 +185,7 @@ class APTracker(Extension):
         await self.ap_refresh(ctx)
 
     async def sync_cheese(self, player: User, room: str) -> Multiworld:
-        if 'cheesetrackers' in room:
-            ch_id = room.split('/')[-1]
-            multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
-            await multiworld.refresh()
-            room = multiworld.upstream_url
-
-        if '/tracker/' in room:
-            room = room.split('/')[-1]
-        multiworld = self.cheese.get(room)
-        if multiworld is None:
-            ap_url = f"https://archipelago.gg/tracker/{room}"
-            ch_id = (
-                requests.post(
-                    "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
-                    json={"url": ap_url},
-                )
-                .json()
-                .get("tracker_id")
-            )
-            multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
+        room, multiworld = await self.url_to_multiworld(room)
 
         await multiworld.refresh()
         self.cheese[room] = multiworld
@@ -223,6 +215,7 @@ class APTracker(Extension):
                     tracker = TrackedGame(game["url"])
                     self.trackers[player.id].append(tracker)
                     self.save()
+                    self.check_for_dp(tracker)
 
             if tracker:
                 if multiworld.title:
@@ -242,6 +235,29 @@ class APTracker(Extension):
                     continue
 
         return multiworld
+
+    async def url_to_multiworld(self, room):
+        if 'cheesetrackers' in room:
+            ch_id = room.split('/')[-1]
+            multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
+            await multiworld.refresh()
+            room = multiworld.upstream_url
+
+        if '/tracker/' in room:
+            room = room.split('/')[-1]
+        multiworld = self.cheese.get(room)
+        if multiworld is None:
+            ap_url = f"https://archipelago.gg/tracker/{room}"
+            ch_id = (
+                requests.post(
+                    "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
+                    json={"url": ap_url},
+                )
+                .json()
+                .get("tracker_id")
+            )
+            multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
+        return room,multiworld
 
     def remove_tracker(self, player, url):
         for t in self.trackers[player.id]:
