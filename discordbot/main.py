@@ -1,9 +1,10 @@
 import asyncio
 import sys
-from redis import asyncio as aioredis
+
 import interactions
-from interactions.ext import prefixed_commands as prefixed
 from interactions.ext import hybrid_commands as hybrid
+from interactions.ext import prefixed_commands as prefixed
+from redis import asyncio as aioredis
 
 from shared import configuration
 

@@ -2,10 +2,10 @@ import datetime
 import enum
 import json
 import logging
-import attrs
-from bs4 import BeautifulSoup
-import requests
 
+import attrs
+import requests
+from bs4 import BeautifulSoup
 
 ItemClassification = enum.Enum("ItemClassification", "unknown trap filler useful progression")
 

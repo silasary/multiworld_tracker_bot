@@ -1,8 +1,8 @@
+import logging
 import os
 import subprocess
-import logging
 
-from interactions.models.internal.tasks import Task, IntervalTrigger
+from interactions.models.internal.tasks import IntervalTrigger, Task
 
 from .multiworld import Datapackage, ItemClassification
 
