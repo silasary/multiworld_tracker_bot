@@ -57,7 +57,7 @@ class APTracker(Extension):
         """Track an Archipelago game."""
         if url.split("/")[-1].isnumeric():
             # Track slot
-            await ctx.defer()
+            await ctx.defer(ephemeral=True)
             if ctx.author_id not in self.trackers:
                 self.trackers[ctx.author_id] = []
 
@@ -74,7 +74,7 @@ class APTracker(Extension):
             await self.send_new_items(ctx, tracker, new_items)
         else:
             # Track cheese room
-            await ctx.defer()
+            await ctx.defer(ephemeral=True)
             await self.sync_cheese(ctx.author, url)
             await self.ap_refresh(ctx)
 
