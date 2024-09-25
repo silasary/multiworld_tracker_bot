@@ -11,3 +11,5 @@ Simple discord bot.  It watches your slots in asyncs, and sends Discord DMs when
   - A slot tracker: https://archipelago.gg/tracker/AAAAAAAAAAAAAA/0/7
   - A Cheese Tracker URL: https://cheesetrackers.theincrediblewheelofchee.se/tracker/AAAAAAAAAAAAAA (This will check for slots you've claimed)
 4. Wait for hourly updates 😄
+
+![image](https://github.com/user-attachments/assets/6e37d4e7-8562-4b8f-94e0-7d3d21963281)
