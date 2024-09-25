@@ -78,6 +78,9 @@ class APTracker(Extension):
             await self.ap_refresh(ctx)
 
     def check_for_dp(self, tracker):
+        if tracker.game is None:
+            return
+
         if tracker.game not in self.datapackages:
             self.datapackages[tracker.game] = Datapackage(items={})
             zoggoth.load_datapackage(tracker.game, self.datapackages[tracker.game])
@@ -208,6 +211,7 @@ class APTracker(Extension):
                     tracker = TrackedGame(game["url"])
                     self.trackers[player.id].append(tracker)
                     self.save()
+                    tracker.game = game["game"]
                     self.check_for_dp(tracker)
 
             if tracker:
