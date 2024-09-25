@@ -174,6 +174,12 @@ class APTracker(Extension):
         await self.ap_refresh(ctx)
 
     async def sync_cheese(self, player: User, room: str) -> Multiworld:
+        if 'cheesetrackers' in room:
+            ch_id = room.split('/')[-1]
+            multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
+            await multiworld.refresh()
+            room = multiworld.upstream_url
+
         if '/tracker/' in room:
             room = room.split('/')[-1]
         multiworld = self.cheese.get(room)

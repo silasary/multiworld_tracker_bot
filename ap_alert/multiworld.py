@@ -79,6 +79,7 @@ class Multiworld:
     games: dict[int, CheeseGame] = None
     last_check: datetime.datetime = None
     last_update: datetime.datetime = None
+    upstream_url: str = None
 
     async def refresh(self) -> None:
         if self.last_check and datetime.datetime.now() - self.last_check < datetime.timedelta(days=1):
@@ -92,6 +93,7 @@ class Multiworld:
         self.title = data.get("title")
         self.games = {g["position"]: CheeseGame(g) for g in data.get("games")}
         self.last_update = datetime.datetime.fromisoformat(data.get("updated_at"))
+        self.upstream_url = data.get("upstream_url")
 
     def last_activity(self) -> datetime.datetime:
         return max(g.last_activity for g in self.games.values())

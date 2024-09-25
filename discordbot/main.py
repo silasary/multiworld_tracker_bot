@@ -17,6 +17,7 @@ class Bot(interactions.Client):
             enable_emoji_cache=True,
             sync_interactions=True,
             sync_ext=True,
+            send_command_tracebacks=False,
         )
         super().load_extension(
             "interactions.ext.sentry",
