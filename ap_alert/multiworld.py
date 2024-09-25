@@ -47,6 +47,10 @@ class TrackedGame:
             self.failures += 1
             return []
         recieved = soup.find(id="received-table")
+        if recieved is None:
+            if '/tracker/' in self.url:
+                self.url = self.url.replace('/tracker/', '/generic_tracker/')
+                return self.refresh()
         headers = [i.string for i in recieved.find_all("th")]
         rows = [[try_int(i.string) for i in r.find_all("td")] for r in recieved.find_all("tr")[1:]]
         if not rows:
