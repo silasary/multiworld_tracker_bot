@@ -45,7 +45,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
     to_append = set(dp.items.keys())
     to_append.discard("Rollback detected!")
 
-    trailing_newline = False
+    trailing_newline = True
 
     with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")) as f:
         for line in f:
