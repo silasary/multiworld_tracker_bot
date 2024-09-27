@@ -274,9 +274,8 @@ class APTracker(Extension):
             urls = set()
             for tracker in trackers:
                 if tracker.url in urls:
-                    tracker.failures += 1
-                    if tracker.failures > 10:
-                        self.remove_tracker(player, tracker.url)
+                    self.remove_tracker(player, tracker.url)
+                    self.save()
                     continue
                 urls.add(tracker.url)
                 await self.sync_cheese(player, tracker.tracker_id)
