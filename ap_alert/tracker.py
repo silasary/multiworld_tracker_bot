@@ -115,13 +115,14 @@ class APTracker(Extension):
     async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[str]) -> None:
         unclassified = [i[0] for i in new_items if self.get_classification(tracker.game, i[0]) == ItemClassification.unknown]
         for item in unclassified:
+            trap = Button(style=ButtonStyle.RED, label="Trap")
             filler = Button(style=ButtonStyle.GREY, label="Filler")
             useful = Button(style=ButtonStyle.GREEN, label="Useful")
             progression = Button(style=ButtonStyle.BLUE, label="Progression")
             msg = await ctx.send(
                 f"[{tracker.game}] What kind of item is {item}?",
                 ephemeral=False,
-                components=[[filler, useful, progression]],
+                components=[[trap, filler, useful, progression]],
             )
             try:
                 chosen = await self.bot.wait_for_component(msg, timeout=3600)
@@ -131,6 +132,8 @@ class APTracker(Extension):
                     classification = ItemClassification.useful
                 elif chosen.ctx.custom_id == progression.custom_id:
                     classification = ItemClassification.progression
+                elif chosen.ctx.custom_id == trap.custom_id:
+                    classification = ItemClassification.trap
                 else:
                     print(f"wat: {chosen.ctx.custom_id}")
                 self.datapackages[tracker.game].items[item] = classification
