@@ -91,7 +91,10 @@ class APTracker(Extension):
             await ctx.send(f"Track a game with {self.ap_track.mention()} first", ephemeral=True)
             return
 
-        await ctx.defer(suppress_error=True)
+        if ctx.guild_id:
+            await ctx.defer(ephemeral=True)
+        else:
+            await ctx.defer()
 
         games = {}
         for tracker in self.trackers[ctx.author_id]:
