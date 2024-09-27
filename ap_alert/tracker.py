@@ -69,7 +69,7 @@ class APTracker(Extension):
             tracker.game = slot["game"]
             self.check_for_dp(tracker)
 
-            # tracker.name = f"{room} - **{slot['name']}**"
+            tracker.name = f"{room} - **{slot['name']}**"
             await self.ap_refresh(ctx)
         else:
             # Track cheese room
