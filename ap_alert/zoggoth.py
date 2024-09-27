@@ -41,6 +41,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
         with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "w") as f:
             f.write("")
 
+    all_keys = set(dp.items.keys())
     to_append = set(dp.items.keys())
     to_append.discard("Rollback detected!")
 
@@ -52,8 +53,12 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
                 trailing_newline = True
                 continue
             splits = line.split(": ")
-            key = ":".join(splits[:-1])
+            key = ": ".join(splits[:-1])
             value = splits[-1].strip().lower()
+
+            bad_key = ": ".join(splits[:-1])  # oops
+            if bad_key in dp.items:
+                dp.items.pop(bad_key)
 
             to_append.discard(key)
             if value == "unknown":
