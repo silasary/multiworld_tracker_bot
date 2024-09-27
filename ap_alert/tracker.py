@@ -179,6 +179,10 @@ class APTracker(Extension):
             text = f"{slot_name}:\n{', '.join(names)}"
             if len(text) > 1900:
                 paginator = Paginator.create_from_string(self.bot, text)
+                if isinstance(ctx_or_user, User):
+                    # I hate this so much.  Paginators currently require a context, but we're sliding into DMs.
+                    # This makes the user look like a context so that the paginator can do button things and not crash.
+                    ctx_or_user.author = ctx_or_user
                 await paginator.send(ctx_or_user)
             else:
                 await ctx_or_user.send(text, ephemeral=False)
