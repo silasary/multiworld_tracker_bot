@@ -48,6 +48,12 @@ class APTracker(Extension):
     @slash_option("url", "URL of the multiworld tracker", OptionType.STRING, required=True)
     async def ap_track(self, ctx: SlashContext, url: str) -> None:
         """Track an Archipelago game."""
+        try:
+            await ctx.author.fetch_dm()  # Make sure we can send DMs to this player
+        except Forbidden:
+            await ctx.send("I can't send you DMs, please enable them so I can notify you when you get new items.", ephemeral=True)
+            return
+
         if url.split("/")[-1].isnumeric():
             # Track slot
             await ctx.defer(ephemeral=True)
@@ -140,7 +146,7 @@ class APTracker(Extension):
                 await chosen.ctx.send(f"✅{item} is {classification}", ephemeral=True)
             except TimeoutError:
                 await msg.channel.delete_message(msg)
-                return
+                break
             await msg.channel.delete_message(msg)
             self.save()
         zoggoth.load_datapackage(tracker.game, self.datapackages[tracker.game])
