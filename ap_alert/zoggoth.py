@@ -19,9 +19,11 @@ def clone_repo() -> None:
     if os.path.exists("zoggoth_repo"):
         subprocess.run(["git", "reset", "--hard", "origin/main"], cwd="zoggoth_repo")
         subprocess.run(["git", "pull"], cwd="zoggoth_repo")
+        subprocess.run(["git", "pull", "silasary", "main"], cwd="zoggoth_repo")
     else:
         subprocess.run(["git", "clone", repo_url, "zoggoth_repo"])
         subprocess.run(["git", "remote", "add", "silasary", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
+        subprocess.run(["git", "pull", "silasary", "main"], cwd="zoggoth_repo")
 
 def update_all(dps: dict[str, Datapackage]) -> None:
     """Update all datapackages."""
