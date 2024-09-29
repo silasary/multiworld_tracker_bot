@@ -378,8 +378,8 @@ class APTracker(Extension):
                 with open("flush.json") as f:
                     flush = json.loads(f.read())
                     for dp in flush:
-                        self.datapackages[dp] = Datapackage(items={})
-                os.remove("flush.json")
+                        self.datapackages[dp].items.clear()
+                os.rename("flush.json", "flushed.json")
         except Exception as e:
             print(e)
 
