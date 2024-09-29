@@ -336,7 +336,8 @@ class APTracker(Extension):
             del self.cheese[room_id]
 
         self.save()
-        await self.bot.change_presence(activity=f"Tracking {tracker_count} slots across {user_count} users")
+        activity = Activity(name=f"{tracker_count} slots across {user_count} users", type=ActivityType.WATCHING)
+        await self.bot.change_presence(activity=activity)
 
     def get_classification(self, game, item):
         if game not in self.datapackages:
