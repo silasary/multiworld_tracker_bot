@@ -110,6 +110,7 @@ class APTracker(Extension):
 
         if not games:
             await ctx.send("No new items", ephemeral=True)
+            self.save()
             return
 
         for tracker, items in games.items():
@@ -117,6 +118,8 @@ class APTracker(Extension):
 
         for tracker, items in games.items():
             await self.try_classify(ctx, tracker, items)
+        self.save()
+
 
     async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[str]) -> None:
         unclassified = [i[0] for i in new_items if self.get_classification(tracker.game, i[0]) == ItemClassification.unknown]
@@ -360,7 +363,15 @@ class APTracker(Extension):
                     self.datapackages = converter.structure(json.loads(f.read()), dict[str, Datapackage])
         except Exception as e:
             print(e)
-
+        try:
+            if os.path.exists("flush.json"):
+                with open("flush.json") as f:
+                    flush = json.loads(f.read())
+                    for dp in flush:
+                        self.datapackages[dp] = Datapackage(items={})
+                os.remove("flush.json")
+        except Exception as e:
+            print(e)
 
 def recolour_buttons(components: list[Button]) -> list[Button]:
     buttons = []
