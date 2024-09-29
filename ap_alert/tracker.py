@@ -319,7 +319,7 @@ class APTracker(Extension):
                     tracker.failures += 1
 
                 tracker_count += 1
-                await asyncio.sleep(30)
+                await asyncio.sleep(5)
             if trackers:
                 user_count += 1
 
