@@ -8,6 +8,7 @@ import requests
 from bs4 import BeautifulSoup
 
 ItemClassification = enum.Enum("ItemClassification", "unknown trap filler useful progression")
+DATAPACKAGES: dict[str, "Datapackage"] = {}
 
 
 @attrs.define()
@@ -25,6 +26,7 @@ class TrackedGame:
     last_check: datetime.datetime = None
     last_update: datetime.datetime = None
     failures: int = 0
+    last_progression: tuple[str, datetime.datetime] = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
 
     def __hash__(self) -> int:
         return hash(self.url)
@@ -65,7 +67,15 @@ class TrackedGame:
             self.latest_item = -1
             return [("Rollback detected!",)]
         self.last_update = datetime.datetime.now()
-        new_items = [r for r in rows if r[last_index] > self.latest_item]
+        new_items = []
+        for r in rows:
+            if r[last_index] > self.latest_item:
+                new_items.append(r)
+                if DATAPACKAGES.get(self.game) is not None:
+                    classification = DATAPACKAGES[self.game].items.get(r[0])
+                    if classification == ItemClassification.progression:
+                        self.last_progression = (r[0], datetime.datetime.now())
+
         self.latest_item = rows[-1][last_index]
         return new_items
 

@@ -4,7 +4,7 @@ import subprocess
 
 from interactions.models.internal.tasks import IntervalTrigger, Task
 
-from .multiworld import Datapackage, ItemClassification
+from .multiworld import Datapackage, ItemClassification, DATAPACKAGES
 
 classifications = {v.name: v for v in ItemClassification}
 
@@ -12,6 +12,7 @@ classifications = {v.name: v for v in ItemClassification}
 async def update_datapackage() -> None:
     """Update the datapackage."""
     clone_repo()
+    update_all(DATAPACKAGES)
 
 
 def clone_repo() -> None:
@@ -32,6 +33,7 @@ def update_all(dps: dict[str, Datapackage]) -> None:
 
 def load_datapackage(name: str, dp: Datapackage) -> None:
     logging.info(f"Loading datapackage {name}")
+    DATAPACKAGES[name] = dp
     if not os.path.exists("zoggoth_repo"):
         clone_repo()
     if not os.path.exists(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")):
@@ -44,7 +46,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
             f.write("")
 
     all_keys = set(dp.items.keys())
-    to_append = set(dp.items.keys())
+    to_append = set(k for k,v in dp.items.items() if v != ItemClassification.unknown)
     to_append.discard("Rollback detected!")
 
     trailing_newline = True

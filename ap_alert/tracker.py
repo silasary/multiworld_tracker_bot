@@ -54,9 +54,13 @@ class APTracker(Extension):
             await ctx.send("I can't send you DMs, please enable them so I can notify you when you get new items.", ephemeral=True)
             return
 
+        if ctx.guild_id:
+            await ctx.defer(ephemeral=True, suppress_error=True)
+        else:
+            await ctx.defer(suppress_error=True)
+
         if url.split("/")[-1].isnumeric():
             # Track slot
-            await ctx.defer(ephemeral=True)
             if ctx.author_id not in self.trackers:
                 self.trackers[ctx.author_id] = []
 
@@ -79,7 +83,6 @@ class APTracker(Extension):
             await self.ap_refresh(ctx)
         else:
             # Track cheese room
-            await ctx.defer(ephemeral=True)
             await self.sync_cheese(ctx.author, url)
             await self.ap_refresh(ctx)
 
@@ -98,9 +101,9 @@ class APTracker(Extension):
             return
 
         if ctx.guild_id:
-            await ctx.defer(ephemeral=True)
+            await ctx.defer(ephemeral=True, suppress_error=True)
         else:
-            await ctx.defer()
+            await ctx.defer(suppress_error=True)
 
         games = {}
         for tracker in self.trackers[ctx.author_id]:
