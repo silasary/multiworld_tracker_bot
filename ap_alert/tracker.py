@@ -289,6 +289,9 @@ class APTracker(Extension):
 
     @Task.create(IntervalTrigger(hours=1))
     async def refresh_all(self) -> None:
+        user_count = 0
+        tracker_count = 0
+
         for user, trackers in self.trackers.copy().items():
             player = await self.bot.fetch_user(user)
             if not player:
@@ -315,7 +318,10 @@ class APTracker(Extension):
                     logging.error(f"Failed to send message to {player.id}")
                     tracker.failures += 1
 
+                tracker_count += 1
                 await asyncio.sleep(30)
+            if trackers:
+                user_count += 1
 
         to_delete = []
         for room_id, multiwold in self.cheese.items():
@@ -330,6 +336,7 @@ class APTracker(Extension):
             del self.cheese[room_id]
 
         self.save()
+        await self.bot.change_presence(activity=f"Tracking {tracker_count} slots across {user_count} users")
 
     def get_classification(self, game, item):
         if game not in self.datapackages:
