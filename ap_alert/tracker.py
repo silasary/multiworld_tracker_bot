@@ -3,13 +3,14 @@ import datetime
 import json
 import logging
 import os
+import re
 
 import cattrs
 import requests
-from interactions import Client, Extension, SlashContext, listen
+from interactions import Activity, ActivityType, Client, ComponentContext, Extension, PartialEmoji, SlashContext, component_callback, listen, Timestamp, TimestampStyles
 from interactions.client.errors import Forbidden
 from interactions.ext.paginators import Paginator
-from interactions.models.discord import Button, ButtonStyle, User
+from interactions.models.discord import Button, ButtonStyle, User, Embed
 from interactions.models.internal.application_commands import (
     OptionType, integration_types, slash_command, slash_option)
 from interactions.models.internal.tasks import IntervalTrigger, Task
@@ -22,6 +23,7 @@ converter = cattrs.Converter()
 converter.register_structure_hook(datetime.datetime, lambda x, *_: datetime.datetime.fromisoformat(x) if x else None)
 converter.register_unstructure_hook(datetime.datetime, lambda x, *_: x.isoformat() if x else None)
 
+regex_dash = re.compile(r"dash:(\d+)")
 
 class APTracker(Extension):
     def __init__(self, bot: Client) -> None:
