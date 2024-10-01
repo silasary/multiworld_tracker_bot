@@ -16,7 +16,7 @@ from interactions.models.internal.application_commands import (
 from interactions.models.internal.tasks import IntervalTrigger, Task
 
 from . import zoggoth
-from .multiworld import (Datapackage, ItemClassification, Multiworld,
+from .multiworld import (CheeseGame, Datapackage, ItemClassification, Multiworld, ProgressionStatus,
                          TrackedGame)
 
 converter = cattrs.Converter()
@@ -197,6 +197,46 @@ class APTracker(Extension):
         else:
             await ctx_or_user.send(f"{slot_name}: {', '.join(names)}", ephemeral=False)
 
+    @ap.subcommand("dashboard")
+    async def ap_dashboard(self, ctx: SlashContext) -> None:
+        if ctx.author_id not in self.trackers:
+            await ctx.send(f"Track a game with {self.ap_track.mention()} first", ephemeral=True)
+            return
+
+        trackers = self.trackers[ctx.author_id]
+        if not trackers:
+            await ctx.send("No games tracked", ephemeral=True)
+            return
+
+        buttons = []
+        for tracker in trackers:
+            name = tracker.name.replace("*", "")
+            colour = ButtonStyle.BLUE
+            if tracker.progression_status == ProgressionStatus.bk:
+                colour = ButtonStyle.RED
+            elif tracker.progression_status == ProgressionStatus.go or tracker.progression_status == ProgressionStatus.unblocked:
+                colour = ButtonStyle.GREEN
+            buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.id}"))
+        buttons.sort(key=lambda x: x.style)
+        await ctx.send("Select a game to view", ephemeral=True, components=[buttons])
+
+    @component_callback(regex_dash)
+    async def dashboard_embed(self, ctx: ComponentContext) -> Embed:
+        m = regex_dash.match(ctx.custom_id)
+        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        if tracker is None:
+            return Embed(title="Game not found")
+
+        embed = Embed(title=tracker.name)
+        last_check = Timestamp.fromdatetime(tracker.last_check).format(TimestampStyles.RelativeTime)
+        embed.add_field("Last Checked", last_check)
+        last_update = Timestamp.fromdatetime(tracker.last_update).format(TimestampStyles.RelativeTime)
+        embed.add_field("Last Item Recieved", last_update)
+        prog_time = Timestamp.fromdatetime(tracker.last_progression[1]).format(TimestampStyles.RelativeTime) if tracker.last_progression[0] else "N/A"
+        embed.add_field("Last Progression Item", tracker.last_progression[0] + " " + prog_time)
+        embed.add_field("Progression Status", tracker.progression_status.name)
+        return await ctx.send(embed=embed, ephemeral=True)
+
     # @ap.subcommand("cheese")
     @slash_option("room", "room-id", OptionType.STRING, required=True)
     async def ap_cheese(self, ctx: SlashContext, room: str) -> None:
@@ -242,11 +282,8 @@ class APTracker(Extension):
                     self.check_for_dp(tracker)
 
             if tracker:
-                if multiworld.title:
-                    tracker.name = f"***{multiworld.title}*** - **{game['name']}**"
-                else:
-                    tracker.name = f"{room} - **{game['name']}**"
-                tracker.game = game["game"]
+                tracker.name = f"***{multiworld.title}*** - **{game['name']}**"
+                tracker.update(game)
 
                 if is_game_done:
                     await player.send(f"Game {tracker.name} is complete")
@@ -281,7 +318,9 @@ class APTracker(Extension):
                 .get("tracker_id")
             )
             multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
-        return room,multiworld
+            if not multiworld.title:
+                multiworld.title = room
+        return room, multiworld
 
     def remove_tracker(self, player, url):
         for t in self.trackers[player.id]:

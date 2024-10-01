@@ -2,12 +2,15 @@ import datetime
 import enum
 import json
 import logging
+from shared.cursed_enum import CursedStrEnum
 
 import attrs
 import requests
 from bs4 import BeautifulSoup
 
 ItemClassification = enum.Enum("ItemClassification", "unknown trap filler useful progression")
+ProgressionStatus = CursedStrEnum("ProgressionStatus", "unknown bk go soft_bk unblocked")
+
 DATAPACKAGES: dict[str, "Datapackage"] = {}
 
 
@@ -16,10 +19,16 @@ class Datapackage:
     # game: str
     items: dict[str, ItemClassification]
 
+class CheeseGame(dict):
+    @property
+    def last_activity(self) -> datetime.datetime:
+        return datetime.datetime.fromisoformat(self.get("last_activity", "1970-01-01T00:00:00Z"))
+
 
 @attrs.define()
 class TrackedGame:
     url: str  # https://archipelago.gg/tracker/tracker_id/0/slot_id
+    id: int = -1
     latest_item: int = -1
     name: str = None
     game: str = None
@@ -27,6 +36,7 @@ class TrackedGame:
     last_update: datetime.datetime = None
     failures: int = 0
     last_progression: tuple[str, datetime.datetime] = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
+    progression_status: ProgressionStatus = ProgressionStatus.unknown
 
     def __hash__(self) -> int:
         return hash(self.url)
@@ -79,11 +89,11 @@ class TrackedGame:
         self.latest_item = rows[-1][last_index]
         return new_items
 
+    def update(self, data: CheeseGame) -> None:
+        self.game = data["game"]
+        self.id = data["id"]
+        self.progression_status = ProgressionStatus(data["progression_status"])
 
-class CheeseGame(dict):
-    @property
-    def last_activity(self) -> datetime.datetime:
-        return datetime.datetime.fromisoformat(self.get("last_activity", "1970-01-01T00:00:00Z"))
 
 @attrs.define()
 class Multiworld:
@@ -104,7 +114,7 @@ class Multiworld:
         data = requests.get(self.url).text
         data = json.loads(data)
         self.tracker_id = data.get("tracker_id")
-        self.title = data.get("title")
+        self.title = data.get("title", self.title)
         self.games = {g["position"]: CheeseGame(g) for g in data.get("games")}
         self.last_update = datetime.datetime.fromisoformat(data.get("updated_at"))
         self.upstream_url = data.get("upstream_url")
