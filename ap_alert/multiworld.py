@@ -8,8 +8,21 @@ import attrs
 import requests
 from bs4 import BeautifulSoup
 
-ItemClassification = enum.Enum("ItemClassification", "unknown trap filler useful progression")
+classification_types = "unknown trap filler useful progression"
+ItemClassification = enum.Enum("ItemClassification", classification_types)
 ProgressionStatus = CursedStrEnum("ProgressionStatus", "unknown bk go soft_bk unblocked")
+
+class Fiters(enum.Flag):
+    none = 0
+    trap = 1
+    filler = 2
+    useful = 4
+    progression = 8
+
+    everything = trap | filler | useful | progression
+    useful_plus = useful | progression
+
+
 
 DATAPACKAGES: dict[str, "Datapackage"] = {}
 

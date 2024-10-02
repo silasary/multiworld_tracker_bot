@@ -235,14 +235,12 @@ class APTracker(Extension):
         prog_time = Timestamp.fromdatetime(tracker.last_progression[1]).format(TimestampStyles.RelativeTime) if tracker.last_progression[0] else "N/A"
         embed.add_field("Last Progression Item", tracker.last_progression[0] + " " + prog_time)
         embed.add_field("Progression Status", tracker.progression_status.name)
-        return await ctx.send(embed=embed, ephemeral=True)
+        components = []
+        if tracker.last_update and tracker.last_update > datetime.datetime.now() - datetime.timedelta(days=1) and tracker.progression_status == ProgressionStatus.bk:
+            components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
+            components.append(Button(style=ButtonStyle.RED, label="Still BK", custom_id=f"bk:{tracker.id}"))
 
-    # @ap.subcommand("cheese")
-    @slash_option("room", "room-id", OptionType.STRING, required=True)
-    async def ap_cheese(self, ctx: SlashContext, room: str) -> None:
-        await ctx.defer()
-        await self.sync_cheese(ctx.author, room)
-        await self.ap_refresh(ctx)
+        return await ctx.send(embed=embed, ephemeral=True)
 
     async def sync_cheese(self, player: User, room: str) -> Multiworld:
         room, multiworld = await self.url_to_multiworld(room)
