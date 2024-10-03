@@ -261,7 +261,7 @@ class APTracker(Extension):
     @component_callback(regex_bk)
     async def still_bk(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
-        m = regex_unblock.match(ctx.custom_id)
+        m = regex_bk.match(ctx.custom_id)
         tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
         if tracker is None:
             return
