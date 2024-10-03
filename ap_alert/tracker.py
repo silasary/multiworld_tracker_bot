@@ -6,7 +6,7 @@ import os
 import re
 
 import requests
-from interactions import Activity, ActivityType, Client, ComponentContext, Extension, SlashContext, component_callback, listen, Timestamp, TimestampStyles
+from interactions import Activity, ActivityType, Client, ComponentContext, Extension, SlashContext, component_callback, listen, Timestamp, TimestampStyles, spread_to_rows
 from interactions.client.errors import Forbidden
 from interactions.ext.paginators import Paginator
 from interactions.models.discord import Button, ButtonStyle, User, Embed, Message
@@ -217,7 +217,7 @@ class APTracker(Extension):
                 colour = ButtonStyle.GREEN
             buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.id}"))
         buttons.sort(key=lambda x: x.style)
-        await ctx.send("Select a game to view", ephemeral=True, components=[buttons])
+        await ctx.send("Select a game to view", ephemeral=True, components=spread_to_rows(*buttons))
 
     @component_callback(regex_dash)
     async def dashboard_embed(self, ctx: ComponentContext) -> Embed:
