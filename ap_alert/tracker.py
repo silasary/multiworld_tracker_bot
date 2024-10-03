@@ -217,6 +217,9 @@ class APTracker(Extension):
                 colour = ButtonStyle.GREEN
             buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.id}"))
         buttons.sort(key=lambda x: x.style)
+        if len(buttons) > 25:
+            buttons = buttons[:24]
+            # todo: add a paginator for this
         await ctx.send("Select a game to view", ephemeral=True, components=spread_to_rows(*buttons))
 
     @component_callback(regex_dash)
@@ -313,7 +316,10 @@ class APTracker(Extension):
                     self.check_for_dp(tracker)
 
             if tracker:
-                tracker.name = f"***{multiworld.title}*** - **{game['name']}**"
+                if multiworld.title:
+                    tracker.name = f"***{multiworld.title}*** - **{game['name']}**"
+                else:
+                    tracker.name = f"{room} - **{game['name']}**"
                 tracker.update(game)
 
                 if is_game_done:
