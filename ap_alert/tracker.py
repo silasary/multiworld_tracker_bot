@@ -168,11 +168,11 @@ class APTracker(Extension):
             if tracker.game in self.datapackages and item in self.datapackages[tracker.game].items:
                 classification = self.datapackages[tracker.game].items[item]
                 if classification == ItemClassification.filler:
-                    return "<:apfiller:1277502385459171338>"
+                    return "<:f:1277502385459171338>"
                 if classification == ItemClassification.useful:
-                    return "<:apuseful:1277502389729103913>"
+                    return "<:u:1277502389729103913>"
                 if classification == ItemClassification.progression:
-                    return "<:approg:1277502382682542143>"
+                    return "<:p:1277502382682542143>"
                 if classification == ItemClassification.trap:
                     return "❌"
             return "❓"
@@ -183,7 +183,16 @@ class APTracker(Extension):
         if len(names) == 1:
             await ctx_or_user.send(f"{slot_name}: {names[0]}", ephemeral=False)
         elif len(names) > 10:
-            text = f"{slot_name}:\n{', '.join(names)}"
+            text = f"{slot_name}:\n"
+            classes = {ItemClassification.progression: [], ItemClassification.unknown: [], ItemClassification.useful: [], ItemClassification.filler: [],  ItemClassification.trap: []}
+            for name in new_items:
+                classification = self.get_classification(tracker.game, name[0])
+                classes[classification].append(name)
+            for classification, items in classes.items():
+                if items:
+                    text += f"## {classification.name}:\n"
+                    text += "\n".join([f"{icon(i[0])} {i[0]}" for i in items]) + "\n"
+
             if len(text) > 1900:
                 paginator = Paginator.create_from_string(self.bot, text)
                 if isinstance(ctx_or_user, User):
