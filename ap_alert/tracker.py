@@ -5,25 +5,24 @@ import logging
 import os
 import re
 
-import cattrs
 import requests
-from interactions import Activity, ActivityType, Client, ComponentContext, Extension, PartialEmoji, SlashContext, component_callback, listen, Timestamp, TimestampStyles
+from interactions import Activity, ActivityType, Client, ComponentContext, Extension, SlashContext, component_callback, listen, Timestamp, TimestampStyles
 from interactions.client.errors import Forbidden
 from interactions.ext.paginators import Paginator
-from interactions.models.discord import Button, ButtonStyle, User, Embed
+from interactions.models.discord import Button, ButtonStyle, User, Embed, Message
 from interactions.models.internal.application_commands import (
     OptionType, integration_types, slash_command, slash_option)
 from interactions.models.internal.tasks import IntervalTrigger, Task
 
-from . import zoggoth
-from .multiworld import (CheeseGame, Datapackage, ItemClassification, Multiworld, ProgressionStatus,
-                         TrackedGame)
+from ap_alert.converter import converter
 
-converter = cattrs.Converter()
-converter.register_structure_hook(datetime.datetime, lambda x, *_: datetime.datetime.fromisoformat(x) if x else None)
-converter.register_unstructure_hook(datetime.datetime, lambda x, *_: x.isoformat() if x else None)
+from . import zoggoth
+from .multiworld import (Datapackage, ItemClassification, Multiworld, ProgressionStatus, TrackedGame)
+
 
 regex_dash = re.compile(r"dash:(\d+)")
+regex_unblock = re.compile(r"unblock:(\d+)")
+regex_bk = re.compile(r"bk:(\d+)")
 
 class APTracker(Extension):
     def __init__(self, bot: Client) -> None:
@@ -164,7 +163,7 @@ class APTracker(Extension):
         ctx_or_user: SlashContext | User,
         tracker: TrackedGame,
         new_items: list[list[str]],
-    ):
+    ) -> Message:
         def icon(item):
             if tracker.game in self.datapackages and item in self.datapackages[tracker.game].items:
                 classification = self.datapackages[tracker.game].items[item]
@@ -191,11 +190,11 @@ class APTracker(Extension):
                     # I hate this so much.  Paginators currently require a context, but we're sliding into DMs.
                     # This makes the user look like a context so that the paginator can do button things and not crash.
                     ctx_or_user.author = ctx_or_user
-                await paginator.send(ctx_or_user)
+                return await paginator.send(ctx_or_user)
             else:
-                await ctx_or_user.send(text, ephemeral=False)
+                return await ctx_or_user.send(text, ephemeral=False)
         else:
-            await ctx_or_user.send(f"{slot_name}: {', '.join(names)}", ephemeral=False)
+            return await ctx_or_user.send(f"{slot_name}: {', '.join(names)}", ephemeral=False)
 
     @ap.subcommand("dashboard")
     async def ap_dashboard(self, ctx: SlashContext) -> None:
@@ -240,7 +239,41 @@ class APTracker(Extension):
             components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
             components.append(Button(style=ButtonStyle.RED, label="Still BK", custom_id=f"bk:{tracker.id}"))
 
-        return await ctx.send(embed=embed, ephemeral=True)
+        return await ctx.send(embed=embed, components=components, ephemeral=True)
+
+    @component_callback(regex_unblock)
+    async def unblock(self, ctx: ComponentContext) -> None:
+        await ctx.defer(ephemeral=True)
+        m = regex_unblock.match(ctx.custom_id)
+        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        if tracker is None:
+            return
+        multiworld = self.cheese[tracker.tracker_id]
+        await multiworld.refresh(force=True)
+        game = multiworld.games[tracker.slot_id]
+        game["progression_status"] = ProgressionStatus.unblocked
+        # game['last_checked'] = datetime.datetime.now(tz=datetime.timezone.utc)
+        multiworld.put(game)
+        tracker.progression_status = ProgressionStatus.unblocked
+
+        await ctx.send("Progression status updated", ephemeral=True)
+
+    @component_callback(regex_bk)
+    async def still_bk(self, ctx: ComponentContext) -> None:
+        await ctx.defer(ephemeral=True)
+        m = regex_unblock.match(ctx.custom_id)
+        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        if tracker is None:
+            return
+        multiworld = self.cheese[tracker.tracker_id]
+        await multiworld.refresh(force=True)
+        game = multiworld.games[tracker.slot_id]
+        # game["progression_status"] = ProgressionStatus.bk
+        game['last_checked'] = datetime.datetime.now(tz=datetime.timezone.utc)
+        multiworld.put(game)
+
+        await ctx.send("Progression status updated", ephemeral=True)
+
 
     async def sync_cheese(self, player: User, room: str) -> Multiworld:
         room, multiworld = await self.url_to_multiworld(room)

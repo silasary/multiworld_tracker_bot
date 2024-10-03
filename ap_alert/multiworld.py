@@ -8,6 +8,8 @@ import attrs
 import requests
 from bs4 import BeautifulSoup
 
+from .converter import converter
+
 classification_types = "unknown trap filler useful progression"
 ItemClassification = enum.Enum("ItemClassification", classification_types)
 ProgressionStatus = CursedStrEnum("ProgressionStatus", "unknown bk go soft_bk unblocked")
@@ -50,6 +52,8 @@ class TrackedGame:
     failures: int = 0
     last_progression: tuple[str, datetime.datetime] = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
     progression_status: ProgressionStatus = ProgressionStatus.unknown
+    all_items: dict[str, int] = attrs.field(factory=dict, init=False)
+    new_items: list[list[str]] = attrs.field(factory=list, init=False)
 
     def __hash__(self) -> int:
         return hash(self.url)
@@ -60,8 +64,8 @@ class TrackedGame:
         return self.url.split("/")[-3]
 
     @property
-    def slot_id(self) -> str:
-        return self.url.split("/")[-1]
+    def slot_id(self) -> int:
+        return int(self.url.split("/")[-1])
 
     def refresh(self) -> list[list[str]]:
         logging.info(f"Refreshing {self.url}")
@@ -81,25 +85,30 @@ class TrackedGame:
         if not rows:
             return []
 
+        index_order = headers.index("Last Order Received")
+        index_amount = headers.index("Amount")
+        index_item = headers.index("Item")
+
         self.last_check = datetime.datetime.now()
-        last_index = headers.index("Last Order Received")
-        rows.sort(key=lambda r: r[last_index])
-        if rows[-1][last_index] == self.latest_item:
+        rows.sort(key=lambda r: r[index_order])
+        if rows[-1][index_order] == self.latest_item:
             return []
-        elif rows[-1][last_index] < self.latest_item:
+        elif rows[-1][index_order] < self.latest_item:
             self.latest_item = -1
             return [("Rollback detected!",)]
         self.last_update = datetime.datetime.now()
         new_items = []
         for r in rows:
-            if r[last_index] > self.latest_item:
+            self.all_items[r[index_item]] = r[index_amount]
+            if r[index_order] > self.latest_item:
                 new_items.append(r)
                 if DATAPACKAGES.get(self.game) is not None:
                     classification = DATAPACKAGES[self.game].items.get(r[0])
                     if classification == ItemClassification.progression:
                         self.last_progression = (r[0], datetime.datetime.now())
 
-        self.latest_item = rows[-1][last_index]
+        self.latest_item = rows[-1][index_order]
+        self.new_items = new_items
         return new_items
 
     def update(self, data: CheeseGame) -> None:
@@ -114,14 +123,14 @@ class Multiworld:
     tracker_id: str = None
     title: str = None
     games: dict[int, CheeseGame] = None
-    last_check: datetime.datetime = None
+    last_refreshed: datetime.datetime = None
     last_update: datetime.datetime = None
     upstream_url: str = None
 
-    async def refresh(self) -> None:
-        if self.last_check and datetime.datetime.now() - self.last_check < datetime.timedelta(days=1):
+    async def refresh(self, force: bool = False) -> None:
+        if self.last_refreshed and datetime.datetime.now() - self.last_refreshed < datetime.timedelta(hours=1) and not force:
             return
-        self.last_check = datetime.datetime.now()
+        self.last_refreshed = datetime.datetime.now()
 
         logging.info(f"Refreshing {self.url}")
         data = requests.get(self.url).text
@@ -135,7 +144,10 @@ class Multiworld:
     def last_activity(self) -> datetime.datetime:
         return max(g.last_activity for g in self.games.values())
 
-
+    def put(self, game: CheeseGame) -> None:
+        # PUT https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/MMV8lMURTE6KoOLAPSs2Dw/game/63591
+        game = converter.unstructure(game)  # convert datetime to isoformat
+        requests.put(f"{self.url}/game/{game['id']}", json=game)
 
 def try_int(text: str) -> str | int:
     try:
