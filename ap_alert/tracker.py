@@ -55,10 +55,7 @@ class APTracker(Extension):
             await ctx.send("I can't send you DMs, please enable them so I can notify you when you get new items.", ephemeral=True)
             return
 
-        if ctx.guild_id:
-            await ctx.defer(ephemeral=True, suppress_error=True)
-        else:
-            await ctx.defer(suppress_error=True)
+        await defer_ephemeral_if_guild(ctx)
 
         if url.split("/")[-1].isnumeric():
             # Track slot
@@ -101,10 +98,7 @@ class APTracker(Extension):
             await ctx.send(f"Track a game with {self.ap_track.mention()} first", ephemeral=True)
             return
 
-        if ctx.guild_id:
-            await ctx.defer(ephemeral=True, suppress_error=True)
-        else:
-            await ctx.defer(suppress_error=True)
+        ephemeral = await defer_ephemeral_if_guild(ctx)
 
         games = {}
         for tracker in self.trackers[ctx.author_id]:
@@ -118,12 +112,11 @@ class APTracker(Extension):
             return
 
         for tracker, items in games.items():
-            await self.send_new_items(ctx, tracker, items)
+            await self.send_new_items(ctx, tracker, items, ephemeral)
 
         for tracker, items in games.items():
             await self.try_classify(ctx, tracker, items)
         self.save()
-
 
     async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[str]) -> None:
         unclassified = [i[0] for i in new_items if self.get_classification(tracker.game, i[0]) == ItemClassification.unknown]
@@ -163,6 +156,7 @@ class APTracker(Extension):
         ctx_or_user: SlashContext | User,
         tracker: TrackedGame,
         new_items: list[list[str]],
+        ephemeral: bool = False,
     ) -> Message:
         def icon(item):
             if tracker.game in self.datapackages and item in self.datapackages[tracker.game].items:
@@ -181,7 +175,7 @@ class APTracker(Extension):
         slot_name = tracker.name or tracker.url
 
         if len(names) == 1:
-            await ctx_or_user.send(f"{slot_name}: {names[0]}", ephemeral=False)
+            await ctx_or_user.send(f"{slot_name}: {names[0]}", ephemeral=ephemeral)
         elif len(names) > 10:
             text = f"{slot_name}:\n"
             classes = {ItemClassification.progression: [], ItemClassification.unknown: [], ItemClassification.useful: [], ItemClassification.filler: [],  ItemClassification.trap: []}
@@ -199,11 +193,11 @@ class APTracker(Extension):
                     # I hate this so much.  Paginators currently require a context, but we're sliding into DMs.
                     # This makes the user look like a context so that the paginator can do button things and not crash.
                     ctx_or_user.author = ctx_or_user
-                return await paginator.send(ctx_or_user)
+                return await paginator.send(ctx_or_user, ephemeral=ephemeral)
             else:
-                return await ctx_or_user.send(text, ephemeral=False)
+                return await ctx_or_user.send(text, ephemeral=ephemeral)
         else:
-            return await ctx_or_user.send(f"{slot_name}: {', '.join(names)}", ephemeral=False)
+            return await ctx_or_user.send(f"{slot_name}: {', '.join(names)}", ephemeral=ephemeral)
 
     @ap.subcommand("dashboard")
     async def ap_dashboard(self, ctx: SlashContext) -> None:
@@ -239,8 +233,8 @@ class APTracker(Extension):
             return Embed(title="Game not found")
 
         embed = Embed(title=tracker.name)
-        last_check = Timestamp.fromdatetime(tracker.last_check).format(TimestampStyles.RelativeTime)
-        embed.add_field("Last Checked", last_check)
+        last_check = Timestamp.fromdatetime(tracker.last_refresh).format(TimestampStyles.RelativeTime)
+        embed.add_field("Last Refreshed", last_check)
         last_update = Timestamp.fromdatetime(tracker.last_update).format(TimestampStyles.RelativeTime)
         embed.add_field("Last Item Recieved", last_update)
         prog_time = Timestamp.fromdatetime(tracker.last_progression[1]).format(TimestampStyles.RelativeTime) if tracker.last_progression[0] else "N/A"
@@ -333,12 +327,12 @@ class APTracker(Extension):
 
                 if is_game_done:
                     await player.send(f"Game {tracker.name} is complete")
-                    self.remove_tracker(player, game["url"])
+                    self.remove_tracker(player, tracker.url)
                     continue
 
                 if is_game_abandoned:
                     # await player.send(f"Game {tracker.name} has finished")
-                    self.remove_tracker(player, game["url"])
+                    self.remove_tracker(player, tracker.url)
                     continue
 
         return multiworld
@@ -369,7 +363,7 @@ class APTracker(Extension):
         return room, multiworld
 
     def remove_tracker(self, player, url):
-        for t in self.trackers[player.id]:
+        for t in self.trackers[player.id].copy():
             if t.url == url:
                 self.trackers[player.id].remove(t)
                 return
@@ -479,3 +473,11 @@ def recolour_buttons(components: list[Button]) -> list[Button]:
         if isinstance(c, Button):
             buttons.append(Button(style=ButtonStyle.GREY, label=c.label, emoji=c.emoji, disabled=True))
     return buttons
+
+async def defer_ephemeral_if_guild(ctx) -> bool:
+    if ctx.guild_id:
+        await ctx.defer(ephemeral=True, suppress_error=True)
+        return True
+    else:
+        await ctx.defer(suppress_error=True)
+        return False

@@ -19,9 +19,11 @@ class Fiters(enum.Flag):
     filler = 2
     useful = 4
     progression = 8
+    mcguffin = 16
+    unset = 32
 
-    everything = trap | filler | useful | progression
-    useful_plus = useful | progression
+    everything = trap | filler | useful | progression | mcguffin
+    useful_plus = useful | progression | mcguffin
 
 
 
@@ -44,15 +46,21 @@ class TrackedGame:
     url: str  # https://archipelago.gg/tracker/tracker_id/0/slot_id
     id: int = -1
     latest_item: int = -1
+
     name: str = None
     game: str = None
-    last_check: datetime.datetime = None
+    last_refresh: datetime.datetime = None
     last_update: datetime.datetime = None
     failures: int = 0
+    filters: Fiters = Fiters.unset
+
     last_progression: tuple[str, datetime.datetime] = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
+    last_item: tuple[str, datetime.datetime] = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
     progression_status: ProgressionStatus = ProgressionStatus.unknown
+
     all_items: dict[str, int] = attrs.field(factory=dict, init=False)
     new_items: list[list[str]] = attrs.field(factory=list, init=False)
+
 
     def __hash__(self) -> int:
         return hash(self.url)
@@ -88,7 +96,7 @@ class TrackedGame:
         index_amount = headers.index("Amount")
         index_item = headers.index("Item")
 
-        self.last_check = datetime.datetime.now()
+        self.last_refresh = datetime.datetime.now()
         rows.sort(key=lambda r: r[index_order])
         if rows[-1][index_order] == self.latest_item:
             return []
@@ -105,6 +113,8 @@ class TrackedGame:
                     classification = DATAPACKAGES[self.game].items.get(r[0])
                     if classification == ItemClassification.progression:
                         self.last_progression = (r[0], datetime.datetime.now())
+
+        self.last_item = (rows[-1][0], datetime.datetime.now())
 
         self.latest_item = rows[-1][index_order]
         self.new_items = new_items
