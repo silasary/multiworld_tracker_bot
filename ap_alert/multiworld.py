@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 
 from .converter import converter
 
-ItemClassification = enum.Enum("ItemClassification", "unknown trap filler useful progression")
+ItemClassification = enum.Enum("ItemClassification", "unknown trap filler useful progression mcguffin")
 ProgressionStatus = CursedStrEnum("ProgressionStatus", "unknown bk go soft_bk unblocked")
 
 class Fiters(enum.Flag):

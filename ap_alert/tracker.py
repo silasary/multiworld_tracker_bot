@@ -161,6 +161,8 @@ class APTracker(Extension):
         def icon(item):
             if tracker.game in self.datapackages and item in self.datapackages[tracker.game].items:
                 classification = self.datapackages[tracker.game].items[item]
+                if classification == ItemClassification.mcguffin:
+                    return "✨"
                 if classification == ItemClassification.filler:
                     return "<:f:1277502385459171338>"
                 if classification == ItemClassification.useful:
