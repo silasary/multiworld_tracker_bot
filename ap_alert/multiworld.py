@@ -12,6 +12,7 @@ from .converter import converter
 
 ItemClassification = enum.Enum("ItemClassification", "unknown trap filler useful progression mcguffin")
 ProgressionStatus = CursedStrEnum("ProgressionStatus", "unknown bk go soft_bk unblocked")
+HintClassification = CursedStrEnum("HintClassification", "unknown critical useful trash")
 
 class Fiters(enum.Flag):
     none = 0
@@ -135,6 +136,8 @@ class Multiworld:
     last_refreshed: datetime.datetime = None
     last_update: datetime.datetime = None
     upstream_url: str = None
+    room_url: str = None
+    last_port: int = None
 
     async def refresh(self, force: bool = False) -> None:
         if self.last_refreshed and datetime.datetime.now() - self.last_refreshed < datetime.timedelta(hours=1) and not force:
@@ -149,6 +152,8 @@ class Multiworld:
         self.games = {g["position"]: CheeseGame(g) for g in data.get("games")}
         self.last_update = datetime.datetime.fromisoformat(data.get("updated_at"))
         self.upstream_url = data.get("upstream_url")
+        self.room_url = data.get("room_url")
+        self.last_port = data.get("last_port")
 
     def last_activity(self) -> datetime.datetime:
         return max(g.last_activity for g in self.games.values())
@@ -163,4 +168,16 @@ def try_int(text: str) -> str | int:
         return int(text)
     except ValueError:
         return text
+
+
+@attrs.define()
+class Hint:
+    id: int
+    finder_game_id: int
+    receiver_game_id: int
+    item: str
+    location: str
+    entrance: str
+    found: bool
+    classification: HintClassification
 

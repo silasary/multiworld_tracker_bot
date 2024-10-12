@@ -212,7 +212,7 @@ class APTracker(Extension):
             await ctx.send("No games tracked", ephemeral=True)
             return
 
-        buttons = []
+        buttons: list[Button] = []
         for tracker in trackers:
             name = tracker.name.replace("*", "")
             colour = ButtonStyle.BLUE
@@ -224,6 +224,7 @@ class APTracker(Extension):
         buttons.sort(key=lambda x: x.style)
         if len(buttons) > 25:
             buttons = buttons[:24]
+            buttons.append(Button(style=ButtonStyle.GREY, label="⏩", custom_id=f"p:{buttons[25].custom_id}", disabled=True))
             # todo: add a paginator for this
         await ctx.send("Select a game to view", ephemeral=True, components=spread_to_rows(*buttons))
 
@@ -234,18 +235,30 @@ class APTracker(Extension):
         if tracker is None:
             return Embed(title="Game not found")
 
-        embed = Embed(title=tracker.name)
+        multiworld = self.cheese[tracker.tracker_id]
+
+        name = tracker.name
+        port = f' ({multiworld.last_port})' if multiworld.last_port else ''
+        if not name.endswith(port):
+            name = name + port
+
+        embed = Embed(title=name)
         last_check = Timestamp.fromdatetime(tracker.last_refresh).format(TimestampStyles.RelativeTime)
         embed.add_field("Last Refreshed", last_check)
         last_update = Timestamp.fromdatetime(tracker.last_update).format(TimestampStyles.RelativeTime)
-        embed.add_field("Last Item Recieved", last_update)
+        embed.add_field("Last Item Recieved", tracker.last_item[0] + " " + last_update)
         prog_time = Timestamp.fromdatetime(tracker.last_progression[1]).format(TimestampStyles.RelativeTime) if tracker.last_progression[0] else "N/A"
         embed.add_field("Last Progression Item", tracker.last_progression[0] + " " + prog_time)
         embed.add_field("Progression Status", tracker.progression_status.name)
         components = []
-        if tracker.last_update and tracker.last_update > datetime.datetime.now() - datetime.timedelta(days=1) and tracker.progression_status == ProgressionStatus.bk:
+
+        aged = tracker.last_update and tracker.last_update > datetime.datetime.now() - datetime.timedelta(days=1)
+        if aged and tracker.progression_status == ProgressionStatus.bk:
             components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
             components.append(Button(style=ButtonStyle.RED, label="Still BK", custom_id=f"bk:{tracker.id}"))
+        elif aged and tracker.progression_status == ProgressionStatus.soft_bk:
+            components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
+            components.append(Button(style=ButtonStyle.RED, label="Still Soft BK", custom_id=f"bk:{tracker.id}"))
 
         return await ctx.send(embed=embed, components=components, ephemeral=True)
 

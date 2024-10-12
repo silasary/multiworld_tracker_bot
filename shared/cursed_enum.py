@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Type, Self, TypeVar
+from typing import Type, TypeVar
 
 from interactions import get_logger
 
