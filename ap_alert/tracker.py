@@ -411,7 +411,7 @@ class APTracker(Extension):
                         await self.send_new_items(player, tracker, new_items)
                         asyncio.create_task(self.try_classify(player, tracker, new_items))
                 except Forbidden:
-                    logging.error(f"Failed to send message to {player.id}")
+                    logging.error(f"Failed to send message to {player.global_name} ({player.id})")
                     tracker.failures += 1
 
                 tracker_count += 1
