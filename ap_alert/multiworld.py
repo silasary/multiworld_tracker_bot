@@ -2,6 +2,7 @@ import datetime
 import enum
 import json
 import logging
+from typing import Optional
 from shared.cursed_enum import CursedStrEnum
 
 import attrs
@@ -99,12 +100,13 @@ class TrackedGame:
 
         self.last_refresh = datetime.datetime.now()
         rows.sort(key=lambda r: r[index_order])
-        if rows[-1][index_order] == self.latest_item:
-            return []
-        elif rows[-1][index_order] < self.latest_item:
+        if rows[-1][index_order] < self.latest_item:
             self.latest_item = -1
             return [("Rollback detected!",)]
-        self.last_update = datetime.datetime.now()
+        is_up_to_date = rows[-1][index_order] == self.latest_item
+        if is_up_to_date and self.all_items:
+            return []
+
         new_items = []
         for r in rows:
             self.all_items[r[index_item]] = r[index_amount]
@@ -112,10 +114,14 @@ class TrackedGame:
                 new_items.append(r)
                 if DATAPACKAGES.get(self.game) is not None:
                     classification = DATAPACKAGES[self.game].items.get(r[0])
-                    if classification == ItemClassification.progression:
+                    if classification in [ItemClassification.progression, ItemClassification.mcguffin]:
                         self.last_progression = (r[0], datetime.datetime.now())
 
+        if is_up_to_date:
+            return []
+
         self.last_item = (rows[-1][0], datetime.datetime.now())
+        self.last_update = datetime.datetime.now()
 
         self.latest_item = rows[-1][index_order]
         self.new_items = new_items
@@ -137,7 +143,7 @@ class Multiworld:
     last_update: datetime.datetime = None
     upstream_url: str = None
     room_url: str = None
-    last_port: int = None
+    last_port: Optional[int] = None
 
     async def refresh(self, force: bool = False) -> None:
         if self.last_refreshed and datetime.datetime.now() - self.last_refreshed < datetime.timedelta(hours=1) and not force:

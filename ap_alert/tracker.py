@@ -6,6 +6,7 @@ import os
 import re
 
 import requests
+import sentry_sdk
 from interactions import Activity, ActivityType, Client, ComponentContext, Extension, SlashContext, component_callback, listen, Timestamp, TimestampStyles, spread_to_rows
 from interactions.client.errors import Forbidden
 from interactions.ext.paginators import Paginator
@@ -23,6 +24,7 @@ from .multiworld import (Datapackage, ItemClassification, Multiworld, Progressio
 regex_dash = re.compile(r"dash:(\d+)")
 regex_unblock = re.compile(r"unblock:(\d+)")
 regex_bk = re.compile(r"bk:(\d+)")
+regex_inv = re.compile(r"inv:(\d+)")
 
 class APTracker(Extension):
     def __init__(self, bot: Client) -> None:
@@ -118,7 +120,21 @@ class APTracker(Extension):
             await self.try_classify(ctx, tracker, items)
         self.save()
 
-    async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[str]) -> None:
+    # @ap.subcommand("inventory")
+    # async def ap_inventory(self, ctx: SlashContext) -> None:
+    #     if ctx.author_id not in self.trackers:
+    #         await ctx.send(f"Track a game with {self.ap_track.mention()} first", ephemeral=True)
+    #         return
+
+    #     ephemeral = await defer_ephemeral_if_guild(ctx)
+
+    #     for tracker in self.trackers[ctx.author_id]:
+    #         if not tracker.all_items:
+    #             tracker.refresh()
+    #         items = list([t[0], t[1]] for t in tracker.all_items.items())
+    #         await self.send_new_items(ctx, tracker, items, ephemeral, inventory=True)
+
+    async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[list[str]]) -> None:
         unclassified = [i[0] for i in new_items if self.get_classification(tracker.game, i[0]) == ItemClassification.unknown]
         for item in unclassified:
             trap = Button(style=ButtonStyle.RED, label="Trap")
@@ -157,37 +173,49 @@ class APTracker(Extension):
         tracker: TrackedGame,
         new_items: list[list[str]],
         ephemeral: bool = False,
+        inventory: bool = False,
     ) -> Message:
-        def icon(item):
+        async def icon(item):
             if tracker.game in self.datapackages and item in self.datapackages[tracker.game].items:
                 classification = self.datapackages[tracker.game].items[item]
+                if inventory and classification == ItemClassification.unknown:
+                    await self.try_classify(ctx_or_user, tracker, new_items)
+                    classification = self.datapackages[tracker.game].items[item]
                 if classification == ItemClassification.mcguffin:
                     return "✨"
                 if classification == ItemClassification.filler:
-                    return "<:f:1277502385459171338>"
+                    return f"<:{'f' if len(new_items) > 10 else 'filler'}:1277502385459171338>"
                 if classification == ItemClassification.useful:
-                    return "<:u:1277502389729103913>"
+                    return f"<:{'u' if len(new_items) > 10 else 'useful'}:1277502389729103913>"
                 if classification == ItemClassification.progression:
-                    return "<:p:1277502382682542143>"
+                    return f"<:{'p' if len(new_items) > 10 else 'progression'}:1277502382682542143>"
                 if classification == ItemClassification.trap:
                     return "❌"
             return "❓"
 
-        names = [f"{icon(i[0])} {i[0]}" for i in new_items]
+        names = [f"{await icon(i[0])} {i[0]}" for i in new_items]
         slot_name = tracker.name or tracker.url
 
         if len(names) == 1:
             await ctx_or_user.send(f"{slot_name}: {names[0]}", ephemeral=ephemeral)
         elif len(names) > 10:
             text = f"{slot_name}:\n"
-            classes = {ItemClassification.progression: [], ItemClassification.unknown: [], ItemClassification.useful: [], ItemClassification.filler: [],  ItemClassification.trap: []}
+            classes = {
+                ItemClassification.mcguffin: [],
+                ItemClassification.progression: [],
+                ItemClassification.unknown: [],
+                ItemClassification.useful: [],
+                ItemClassification.filler: [],
+                ItemClassification.trap: []
+            }
+
             for name in new_items:
                 classification = self.get_classification(tracker.game, name[0])
                 classes[classification].append(name)
             for classification, items in classes.items():
                 if items:
                     text += f"## {classification.name}:\n"
-                    text += "\n".join([f"{icon(i[0])} {i[0]}" for i in items]) + "\n"
+                    text += "\n".join([f"{await icon(i[0])} {i[0]}" for i in items]) + "\n"
 
             if len(text) > 1900:
                 paginator = Paginator.create_from_string(self.bot, text)
@@ -245,12 +273,14 @@ class APTracker(Extension):
         embed = Embed(title=name)
         last_check = Timestamp.fromdatetime(tracker.last_refresh).format(TimestampStyles.RelativeTime)
         embed.add_field("Last Refreshed", last_check)
-        last_update = Timestamp.fromdatetime(tracker.last_update).format(TimestampStyles.RelativeTime)
+        last_update = Timestamp.fromdatetime(tracker.last_item[1]).format(TimestampStyles.RelativeTime)
         embed.add_field("Last Item Recieved", tracker.last_item[0] + " " + last_update)
         prog_time = Timestamp.fromdatetime(tracker.last_progression[1]).format(TimestampStyles.RelativeTime) if tracker.last_progression[0] else "N/A"
         embed.add_field("Last Progression Item", tracker.last_progression[0] + " " + prog_time)
         embed.add_field("Progression Status", tracker.progression_status.name)
         components = []
+
+        components.append(Button(style=ButtonStyle.BLURPLE, label="Inventory", custom_id=f"inv:{tracker.id}"))
 
         aged = tracker.last_update and tracker.last_update > datetime.datetime.now() - datetime.timedelta(days=1)
         if aged and tracker.progression_status == ProgressionStatus.bk:
@@ -294,6 +324,17 @@ class APTracker(Extension):
         multiworld.put(game)
 
         await ctx.send("Progression status updated", ephemeral=True)
+
+    @component_callback(regex_inv)
+    async def inventory(self, ctx: ComponentContext) -> None:
+        await ctx.defer(ephemeral=True)
+        m = regex_inv.match(ctx.custom_id)
+        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        if tracker is None:
+            return
+        if not tracker.all_items:
+            tracker.refresh()
+        await self.send_new_items(ctx, tracker, list([i, tracker.all_items[i]] for i in tracker.all_items), ephemeral=True, inventory=True)
 
 
     async def sync_cheese(self, player: User, room: str) -> Multiworld:
@@ -463,12 +504,14 @@ class APTracker(Extension):
                 with open("cheese.json") as f:
                     self.cheese = converter.structure(json.loads(f.read()), dict[str, Multiworld])
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             print(e)
         try:
             if os.path.exists("datapackages.json"):
                 with open("datapackages.json") as f:
                     self.datapackages = converter.structure(json.loads(f.read()), dict[str, Datapackage])
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             print(e)
         try:
             if os.path.exists("flush.json"):
@@ -478,6 +521,7 @@ class APTracker(Extension):
                         self.datapackages[dp].items.clear()
                 os.rename("flush.json", "flushed.json")
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             print(e)
 
 def recolour_buttons(components: list[Button]) -> list[Button]:
