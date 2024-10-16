@@ -18,13 +18,15 @@ from interactions.models.internal.tasks import IntervalTrigger, Task
 from ap_alert.converter import converter
 
 from . import zoggoth
-from .multiworld import (Datapackage, ItemClassification, Multiworld, ProgressionStatus, TrackedGame)
+from .multiworld import (Datapackage, Filters, ItemClassification, Multiworld, ProgressionStatus, TrackedGame)
 
 
 regex_dash = re.compile(r"dash:(\d+)")
 regex_unblock = re.compile(r"unblock:(\d+)")
 regex_bk = re.compile(r"bk:(\d+)")
 regex_inv = re.compile(r"inv:(\d+)")
+regex_settings = re.compile(r"settings:(\d+)")
+regex_filter = re.compile(r"filter:(\d+):(\d+)")
 
 class APTracker(Extension):
     def __init__(self, bot: Client) -> None:
@@ -119,20 +121,6 @@ class APTracker(Extension):
         for tracker, items in games.items():
             await self.try_classify(ctx, tracker, items)
         self.save()
-
-    # @ap.subcommand("inventory")
-    # async def ap_inventory(self, ctx: SlashContext) -> None:
-    #     if ctx.author_id not in self.trackers:
-    #         await ctx.send(f"Track a game with {self.ap_track.mention()} first", ephemeral=True)
-    #         return
-
-    #     ephemeral = await defer_ephemeral_if_guild(ctx)
-
-    #     for tracker in self.trackers[ctx.author_id]:
-    #         if not tracker.all_items:
-    #             tracker.refresh()
-    #         items = list([t[0], t[1]] for t in tracker.all_items.items())
-    #         await self.send_new_items(ctx, tracker, items, ephemeral, inventory=True)
 
     async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[list[str]]) -> None:
         unclassified = [i[0] for i in new_items if self.get_classification(tracker.game, i[0]) == ItemClassification.unknown]
@@ -280,7 +268,8 @@ class APTracker(Extension):
         embed.add_field("Progression Status", tracker.progression_status.name)
         components = []
 
-        components.append(Button(style=ButtonStyle.BLURPLE, label="Inventory", custom_id=f"inv:{tracker.id}"))
+        components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji="💼", custom_id=f"inv:{tracker.id}"))
+        components.append(Button(style=ButtonStyle.GREY, label="Settings",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
 
         aged = tracker.last_update and tracker.last_update > datetime.datetime.now() - datetime.timedelta(days=1)
         if aged and tracker.progression_status == ProgressionStatus.bk:
@@ -336,6 +325,44 @@ class APTracker(Extension):
             tracker.refresh()
         await self.send_new_items(ctx, tracker, list([i, tracker.all_items[i]] for i in tracker.all_items), ephemeral=True, inventory=True)
 
+    @component_callback(regex_settings)
+    async def settings(self, ctx: ComponentContext) -> None:
+        await ctx.defer(ephemeral=True, edit_origin=False)
+        m = regex_settings.match(ctx.custom_id)
+        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        if tracker is None:
+            return
+        multiworld = self.cheese[tracker.tracker_id]
+
+        name = tracker.name
+        port = f' ({multiworld.last_port})' if multiworld.last_port else ''
+        if not name.endswith(port):
+            name = name + port
+
+        embed = Embed(title=name)
+        embed.add_field("Current Notification Filter", tracker.filters.name)
+        components = []
+        def filter_button(name: str, value: Filters):
+            colour = ButtonStyle.GREY
+            if value == tracker.filters:
+                colour = ButtonStyle.GREEN
+            return Button(style=colour, label=name, custom_id=f"filter:{tracker.id}:{value.value}")
+        components.append(filter_button("Filter: Nothing", Filters.none))
+        components.append(filter_button("Filter: Everything", Filters.everything))
+        components.append(filter_button("Filter: Useful+", Filters.useful_plus))
+        components.append(filter_button("Filter: Progression", Filters.progression_plus))
+
+        await ctx.send(embed=embed, components=spread_to_rows(*components))
+
+    @component_callback(regex_filter)
+    async def filter(self, ctx: ComponentContext) -> None:
+        await ctx.defer(ephemeral=True)
+        m = regex_filter.match(ctx.custom_id)
+        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        if tracker is None:
+            return
+        tracker.filters = Filters(int(m.group(2)))
+        await ctx.send("Filter updated", ephemeral=True)
 
     async def sync_cheese(self, player: User, room: str) -> Multiworld:
         room, multiworld = await self.url_to_multiworld(room)

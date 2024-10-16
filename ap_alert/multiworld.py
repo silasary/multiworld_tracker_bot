@@ -15,7 +15,7 @@ ItemClassification = enum.Enum("ItemClassification", "unknown trap filler useful
 ProgressionStatus = CursedStrEnum("ProgressionStatus", "unknown bk go soft_bk unblocked")
 HintClassification = CursedStrEnum("HintClassification", "unknown critical useful trash")
 
-class Fiters(enum.Flag):
+class Filters(enum.Flag):
     none = 0
     trap = 1
     filler = 2
@@ -26,6 +26,7 @@ class Fiters(enum.Flag):
 
     everything = trap | filler | useful | progression | mcguffin
     useful_plus = useful | progression | mcguffin
+    progression_plus = progression | mcguffin
 
 
 
@@ -54,7 +55,7 @@ class TrackedGame:
     last_refresh: datetime.datetime = None
     last_update: datetime.datetime = None
     failures: int = 0
-    filters: Fiters = Fiters.unset
+    filters: Filters = Filters.unset
 
     last_progression: tuple[str, datetime.datetime] = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
     last_item: tuple[str, datetime.datetime] = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
