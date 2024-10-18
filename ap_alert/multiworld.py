@@ -164,6 +164,12 @@ class TrackedGame:
 
         self.latest_item = rows[-1][index_order]
         self.new_items = new_items
+
+        if self.filters == Filters.none:
+            return []
+
+        new_items = [i for i in new_items if i.classification == ItemClassification.unknown or self.filters & Filters(i.classification.value)]
+
         return new_items
 
     def update(self, data: CheeseGame) -> None:
