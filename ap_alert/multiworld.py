@@ -65,6 +65,18 @@ DATAPACKAGES: dict[str, "Datapackage"] = defaultdict(Datapackage)
 
 class CheeseGame(dict):
     @property
+    def id(self) -> int:
+        return self.get("id", -1)
+
+    @property
+    def game(self) -> str:
+        return self.get("game", None)
+
+    @property
+    def progression_status(self) -> str:
+        return ProgressionStatus(self.get("progression_status", "unknown"))
+
+    @property
     def last_activity(self) -> datetime.datetime:
         return datetime.datetime.fromisoformat(self.get("last_activity", "1970-01-01T00:00:00Z"))
 
@@ -155,9 +167,9 @@ class TrackedGame:
         return new_items
 
     def update(self, data: CheeseGame) -> None:
-        self.game = data["game"]
-        self.id = data["id"]
-        self.progression_status = ProgressionStatus(data["progression_status"])
+        self.game = data.game
+        self.id = data.id
+        self.progression_status = ProgressionStatus(data.progression_status)
 
 
 @attrs.define()

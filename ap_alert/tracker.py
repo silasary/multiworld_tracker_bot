@@ -246,7 +246,7 @@ class APTracker(Extension):
         buttons.sort(key=lambda x: x.style)
         if len(buttons) > 25:
             buttons = buttons[:24]
-            buttons.append(Button(style=ButtonStyle.GREY, label="⏩", custom_id=f"p:{buttons[25].custom_id}", disabled=True))
+            buttons.append(Button(style=ButtonStyle.GREY, label="⏩", custom_id=f"p:{buttons[-1].custom_id}", disabled=True))
             # todo: add a paginator for this
         await ctx.send("Select a game to view", ephemeral=True, components=spread_to_rows(*buttons))
 
