@@ -167,6 +167,8 @@ class TrackedGame:
 
         if self.filters == Filters.none:
             return []
+        if self.filters in [Filters.unset, Filters.everything]:
+            return new_items
 
         new_items = [i for i in new_items if i.classification == ItemClassification.unknown or self.filters & Filters(i.classification.value)]
 
