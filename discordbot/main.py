@@ -49,6 +49,9 @@ class Bot(interactions.Client):
         )
         print("--------")
 
+    # @interactions.listen()
+    async def on_button_pressed(self, event: interactions.events.ButtonPressed) -> None:
+        print(event.ctx.custom_id)
 
 def init() -> None:
     client = Bot()

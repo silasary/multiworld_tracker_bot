@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import itertools
 
 import requests
 import sentry_sdk
@@ -18,7 +19,7 @@ from interactions.models.internal.tasks import IntervalTrigger, Task
 from ap_alert.converter import converter
 
 from . import zoggoth
-from .multiworld import (Datapackage, Filters, ItemClassification, Multiworld, ProgressionStatus, TrackedGame)
+from .multiworld import (Datapackage, Filters, ItemClassification, Multiworld, NetworkItem, OldDatapackage, ProgressionStatus, TrackedGame)
 
 
 regex_dash = re.compile(r"dash:(\d+)")
@@ -122,8 +123,8 @@ class APTracker(Extension):
             await self.try_classify(ctx, tracker, items)
         self.save()
 
-    async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[list[str]]) -> None:
-        unclassified = [i[0] for i in new_items if self.get_classification(tracker.game, i[0]) == ItemClassification.unknown]
+    async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[NetworkItem]) -> None:
+        unclassified = [i.name for i in new_items if i.classification == ItemClassification.unknown]
         for item in unclassified:
             trap = Button(style=ButtonStyle.RED, label="Trap")
             filler = Button(style=ButtonStyle.GREY, label="Filler")
@@ -159,29 +160,34 @@ class APTracker(Extension):
         self,
         ctx_or_user: SlashContext | User,
         tracker: TrackedGame,
-        new_items: list[list[str]],
+        new_items: list[NetworkItem],
         ephemeral: bool = False,
         inventory: bool = False,
     ) -> Message:
-        async def icon(item):
-            if tracker.game in self.datapackages and item in self.datapackages[tracker.game].items:
-                classification = self.datapackages[tracker.game].items[item]
+        async def icon(item: NetworkItem) -> str:
+            emoji = "❓"
+
+            if tracker.game in self.datapackages and item.name in self.datapackages[tracker.game].items:
+                classification = self.datapackages[tracker.game].items[item.name]
                 if inventory and classification == ItemClassification.unknown:
                     await self.try_classify(ctx_or_user, tracker, new_items)
-                    classification = self.datapackages[tracker.game].items[item]
+                    classification = self.datapackages[tracker.game].items[item.name]
                 if classification == ItemClassification.mcguffin:
-                    return "✨"
+                    emoji =  "✨"
                 if classification == ItemClassification.filler:
-                    return f"<:{'f' if len(new_items) > 10 else 'filler'}:1277502385459171338>"
+                    emoji = f"<:{'f' if len(new_items) > 10 else 'filler'}:1277502385459171338>"
                 if classification == ItemClassification.useful:
-                    return f"<:{'u' if len(new_items) > 10 else 'useful'}:1277502389729103913>"
+                    emoji = f"<:{'u' if len(new_items) > 10 else 'useful'}:1277502389729103913>"
                 if classification == ItemClassification.progression:
-                    return f"<:{'p' if len(new_items) > 10 else 'progression'}:1277502382682542143>"
+                    emoji = f"<:{'p' if len(new_items) > 10 else 'progression'}:1277502382682542143>"
                 if classification == ItemClassification.trap:
-                    return "❌"
-            return "❓"
+                    emoji = "❌"
 
-        names = [f"{await icon(i[0])} {i[0]}" for i in new_items]
+            if inventory:
+                return f'{emoji} {item.name} x{item.quantity}'
+            return f'{emoji} {item.name}'
+
+        names = [await icon(i) for i in new_items]
         slot_name = tracker.name or tracker.url
 
         if len(names) == 1:
@@ -197,13 +203,13 @@ class APTracker(Extension):
                 ItemClassification.trap: []
             }
 
-            for name in new_items:
-                classification = self.get_classification(tracker.game, name[0])
-                classes[classification].append(name)
+            for item in new_items:
+                classification = item.classification
+                classes[classification].append(item)
             for classification, items in classes.items():
                 if items:
                     text += f"## {classification.name}:\n"
-                    text += "\n".join([f"{await icon(i[0])} {i[0]}" for i in items]) + "\n"
+                    text += "\n".join([await icon(i) for i in items]) + "\n"
 
             if len(text) > 1900:
                 paginator = Paginator.create_from_string(self.bot, text)
@@ -323,7 +329,7 @@ class APTracker(Extension):
             return
         if not tracker.all_items:
             tracker.refresh()
-        await self.send_new_items(ctx, tracker, list([i, tracker.all_items[i]] for i in tracker.all_items), ephemeral=True, inventory=True)
+        await self.send_new_items(ctx, tracker, list(NetworkItem(i, tracker.game, tracker.all_items[i]) for i in tracker.all_items), ephemeral=True, inventory=True)
 
     @component_callback(regex_settings)
     async def settings(self, ctx: ComponentContext) -> None:
@@ -519,7 +525,7 @@ class APTracker(Extension):
         with open("cheese.json", "w") as f:
             f.write(cheese)
         dp = json.dumps(converter.unstructure(self.datapackages), indent=2)
-        with open("datapackages.json", "w") as f:
+        with open("gamedata.json", "w") as f:
             f.write(dp)
 
     def load(self):
@@ -534,9 +540,22 @@ class APTracker(Extension):
             sentry_sdk.capture_exception(e)
             print(e)
         try:
+            if os.path.exists("gamedata.json"):
+                with open("gamedata.json") as f:
+                    self.datapackages = converter.structure(json.loads(f.read()), dict[str, Datapackage])
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            print(e)
+        try:
             if os.path.exists("datapackages.json"):
                 with open("datapackages.json") as f:
-                    self.datapackages = converter.structure(json.loads(f.read()), dict[str, Datapackage])
+                    olds = converter.structure(json.loads(f.read()), dict[str, OldDatapackage])
+                    for name, old in olds.items():
+                        if name not in self.datapackages:
+                            self.datapackages[name] = Datapackage(items={})
+                        for k, v in old.items.items():
+                            self.datapackages[name].items[k] = ItemClassification[v.name]
+
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
@@ -567,3 +586,7 @@ async def defer_ephemeral_if_guild(ctx) -> bool:
     else:
         await ctx.defer(suppress_error=True)
         return False
+
+def chunk(arr_range, arr_size):
+    arr_range = iter(arr_range)
+    return iter(lambda: tuple(itertools.islice(arr_range, arr_size)), ())

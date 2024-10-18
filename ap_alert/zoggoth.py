@@ -80,10 +80,10 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
             if not trailing_newline:
                 f.write("\n")
             for item in to_append:
-                v = repr(dp.items[item]).split(".")[1].split(':')[0]
-                if v == "unknown":
+                v = dp.items[item]
+                if v in [ItemClassification.unknown, ItemClassification.bad_name]:
                     continue
-                f.write(f"{item}: {v}\n")
+                f.write(f"{item}: {v.name}\n")
                 written = True
 
     if written:

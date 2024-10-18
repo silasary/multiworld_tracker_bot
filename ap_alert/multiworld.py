@@ -4,6 +4,7 @@ import json
 import logging
 from typing import Optional
 from shared.cursed_enum import CursedStrEnum
+from collections import defaultdict
 
 import attrs
 import requests
@@ -11,9 +12,20 @@ from bs4 import BeautifulSoup
 
 from .converter import converter
 
-ItemClassification = enum.Enum("ItemClassification", "unknown trap filler useful progression mcguffin")
+OldClassification = enum.Enum("OldClassification", "unknown trap filler useful progression mcguffin")
 ProgressionStatus = CursedStrEnum("ProgressionStatus", "unknown bk go soft_bk unblocked")
 HintClassification = CursedStrEnum("HintClassification", "unknown critical useful trash")
+
+class ItemClassification(enum.Flag):
+    unknown = 0
+    trap = 1
+    filler = 2
+    useful = 4
+    progression = 8
+    mcguffin = 16
+
+    bad_name = 256
+
 
 class Filters(enum.Flag):
     none = 0
@@ -29,14 +41,27 @@ class Filters(enum.Flag):
     progression_plus = progression | mcguffin
 
 
+@attrs.define()
+class NetworkItem:
+    name: str
+    game: str
+    quantity: int
 
-DATAPACKAGES: dict[str, "Datapackage"] = {}
+    @property
+    def classification(self) -> ItemClassification:
+        return DATAPACKAGES[self.game].items.get(self.name, ItemClassification.unknown)
 
+@attrs.define()
+class OldDatapackage:
+    # game: str
+    items: dict[str, OldClassification]
 
 @attrs.define()
 class Datapackage:
-    # game: str
-    items: dict[str, ItemClassification]
+    items: dict[str, ItemClassification] = attrs.field(factory=dict)
+
+
+DATAPACKAGES: dict[str, "Datapackage"] = defaultdict(Datapackage)
 
 class CheeseGame(dict):
     @property
@@ -62,7 +87,7 @@ class TrackedGame:
     progression_status: ProgressionStatus = ProgressionStatus.unknown
 
     all_items: dict[str, int] = attrs.field(factory=dict, init=False)
-    new_items: list[list[str]] = attrs.field(factory=list, init=False)
+    new_items: list[NetworkItem] = attrs.field(factory=list, init=False)
 
 
     def __hash__(self) -> int:
@@ -77,7 +102,7 @@ class TrackedGame:
     def slot_id(self) -> int:
         return int(self.url.split("/")[-1])
 
-    def refresh(self) -> list[list[str]]:
+    def refresh(self) -> list[NetworkItem]:
         logging.info(f"Refreshing {self.url}")
         html = requests.get(self.url).content
         soup = BeautifulSoup(html, features="html.parser")
@@ -108,11 +133,12 @@ class TrackedGame:
         if is_up_to_date and self.all_items:
             return []
 
-        new_items = []
+        new_items: list[NetworkItem] = []
         for r in rows:
             self.all_items[r[index_item]] = r[index_amount]
             if r[index_order] > self.latest_item:
-                new_items.append(r)
+                item = NetworkItem(r[index_item], self.game, r[index_amount])
+                new_items.append(item)
                 if DATAPACKAGES.get(self.game) is not None:
                     classification = DATAPACKAGES[self.game].items.get(r[0])
                     if classification in [ItemClassification.progression, ItemClassification.mcguffin]:
