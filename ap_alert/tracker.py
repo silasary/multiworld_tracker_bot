@@ -244,11 +244,9 @@ class APTracker(Extension):
                 colour = ButtonStyle.GREEN
             buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.id}"))
         buttons.sort(key=lambda x: x.style)
-        if len(buttons) > 25:
-            buttons = buttons[:24]
-            buttons.append(Button(style=ButtonStyle.GREY, label="⏩", custom_id=f"p:{buttons[-1].custom_id}", disabled=True))
-            # todo: add a paginator for this
-        await ctx.send("Select a game to view", ephemeral=True, components=spread_to_rows(*buttons))
+        pages = chunk(buttons, 25)
+        for page in pages:
+            await ctx.send("Select a game to view", ephemeral=True, components=spread_to_rows(*page))
 
     @component_callback(regex_dash)
     async def dashboard_embed(self, ctx: ComponentContext) -> Embed:
