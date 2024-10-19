@@ -50,6 +50,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
     to_append.discard("Rollback detected!")
 
     trailing_newline = True
+    fresh = True
 
     with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")) as f:
         for line in f:
@@ -70,6 +71,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
                 continue
             elif value in classifications:
                 dp.items[key] = classifications[value]
+                fresh = False
             else:
                 logging.error(f"Unknown classification `{value}` for item {key} in {name}.")
             trailing_newline = line.endswith("\n")
@@ -88,8 +90,9 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
 
     if written:
         quoted_name = name.replace(" ", "_")
-        subprocess.run(["git", "branch", "-f", quoted_name], cwd="zoggoth_repo")
-        subprocess.run(["git", "checkout", quoted_name], cwd="zoggoth_repo")
+        if fresh:
+            subprocess.run(["git", "branch", "-f", quoted_name], cwd="zoggoth_repo")
+            subprocess.run(["git", "checkout", quoted_name], cwd="zoggoth_repo")
         subprocess.run(["git", "add", f"worlds/{name}/progression.txt"], cwd="zoggoth_repo")
         subprocess.run(["git", "commit", "-m", f"Update {name} progression"], cwd="zoggoth_repo")
         subprocess.run(["git", "push", "--force", "-u", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
