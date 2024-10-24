@@ -191,7 +191,10 @@ class APTracker(Extension):
         slot_name = tracker.name or tracker.url
 
         if len(names) == 1:
-            await ctx_or_user.send(f"{slot_name}: {names[0]}", ephemeral=ephemeral)
+            components = []
+            if tracker.filters == Filters.unset:
+                components.append(Button(style=ButtonStyle.GREY, label="Configure Filters",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
+            await ctx_or_user.send(f"{slot_name}: {names[0]}", ephemeral=ephemeral, components=components)
         elif len(names) > 10:
             text = f"{slot_name}:\n"
             classes = {
