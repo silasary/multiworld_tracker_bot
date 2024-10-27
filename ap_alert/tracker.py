@@ -437,7 +437,7 @@ class APTracker(Extension):
             await multiworld.refresh()
             room = multiworld.upstream_url
 
-        if '/tracker/' in room:
+        if '/tracker/' in room or '/generic_tracker/' in room:
             room = room.split('/')[-1]
         multiworld = self.cheese.get(room)
         if multiworld is None:
