@@ -245,6 +245,9 @@ class APTracker(Extension):
                 colour = ButtonStyle.RED
             elif tracker.progression_status == ProgressionStatus.go or tracker.progression_status == ProgressionStatus.unblocked:
                 colour = ButtonStyle.GREEN
+            if tracker.id == -1:
+                tracker.id = min(trackers, key=lambda x: x.id).id - 1
+
             buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.id}"))
         buttons.sort(key=lambda x: x.style)
         pages = chunk(buttons, 25)
@@ -474,7 +477,7 @@ class APTracker(Extension):
                     self.save()
                     continue
                 urls.add(tracker.url)
-                await self.sync_cheese(player, tracker.tracker_id)
+                multiworld = await self.sync_cheese(player, tracker.tracker_id)
                 new_items = tracker.refresh()
                 if not new_items and tracker.failures > 10:
                     self.remove_tracker(player, tracker.url)
