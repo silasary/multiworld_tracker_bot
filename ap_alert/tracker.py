@@ -491,7 +491,7 @@ class APTracker(Extension):
                     logging.error(f"Failed to send message to {player.global_name} ({player.id})")
                     tracker.failures += 1
 
-                hints = tracker.refresh_hints(multiworld)
+                # hints = tracker.refresh_hints(multiworld)
                 hints = []
                 if hints:
                     await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints])
