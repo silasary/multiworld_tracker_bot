@@ -243,8 +243,8 @@ class TrackedGame:
             return []
         # hints = [Hint(**h) for h in data if h["receiver_game_id"] == self.id or h["finder_game_id"] == self.id]
         updated = []
-        finder_hints = [Hint(**h) for h in data if h["finder_game_id"] == self.id]
-        receiver_hints = [Hint(**h) for h in data if h["receiver_game_id"] == self.id]
+        finder_hints = [Hint(**h) for h in data if h.get("finder_game_id") == self.id]
+        receiver_hints = [Hint(**h) for h in data if h.get("receiver_game_id") == self.id]
         for hint in finder_hints:
             if hint.id not in self.finder_hints:
                 self.finder_hints[hint.id] = hint
