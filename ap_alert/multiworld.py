@@ -293,7 +293,7 @@ class Multiworld:
     upstream_url: str = None
     room_url: str = None
     last_port: Optional[int] = None
-    hints: list[dict] = None
+    hints: list[dict] | None = None
 
     async def refresh(self, force: bool = False) -> None:
         if self.last_refreshed and datetime.datetime.now() - self.last_refreshed < datetime.timedelta(hours=1) and not force:
