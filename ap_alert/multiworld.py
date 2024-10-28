@@ -239,6 +239,8 @@ class TrackedGame:
 
     def refresh_hints(self, multiworld: "Multiworld") -> list[Hint]:
         data = multiworld.hints
+        if not data:
+            return []
         # hints = [Hint(**h) for h in data if h["receiver_game_id"] == self.id or h["finder_game_id"] == self.id]
         updated = []
         finder_hints = [Hint(**h) for h in data if h["finder_game_id"] == self.id]
