@@ -154,7 +154,6 @@ class APTracker(Extension):
                 break
             await msg.channel.delete_message(msg)
             self.save()
-        zoggoth.load_datapackage(tracker.game, self.datapackages[tracker.game])
 
     async def send_new_items(
         self,
@@ -491,6 +490,10 @@ class APTracker(Extension):
                 except Forbidden:
                     logging.error(f"Failed to send message to {player.global_name} ({player.id})")
                     tracker.failures += 1
+
+                hints = tracker.refresh_hints(multiworld)
+                if hints:
+                    await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints])
 
                 tracker_count += 1
                 await asyncio.sleep(5)
