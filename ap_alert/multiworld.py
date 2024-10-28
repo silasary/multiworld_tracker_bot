@@ -259,6 +259,8 @@ class TrackedGame:
                 self.finder_hints[hint.id].classification = hint.classification
                 self.finder_hints[hint.id].update = HintUpdate.classified
                 updated.append(self.finder_hints[hint.id])
+            if len(hints) == 10:
+                return updated
 
         for hint in receiver_hints:
             if hint.id not in self.receiver_hints:
@@ -274,6 +276,8 @@ class TrackedGame:
                 self.receiver_hints[hint.id].classification = hint.classification
                 self.receiver_hints[hint.id].update = HintUpdate.classified
                 updated.append(self.receiver_hints[hint.id])
+            if len(hints) == 10:
+                return updated
 
         return updated
 
