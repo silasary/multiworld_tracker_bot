@@ -59,19 +59,21 @@ class Hint:
         if self.entrance and self.entrance != "Vanilla":
             description += f" ({self.entrance})"
 
-        if self.classification == HintClassification.critical:
-            description = f"❗ {description}"
-        elif self.classification == HintClassification.trash:
-            description = f"🗑️ {description}"
-        elif self.classification == HintClassification.useful:
-            description = f"🙋 {description}"
+        # if self.classification == HintClassification.critical:
+        #     description = f"❗ {description}"
+        # elif self.classification == HintClassification.trash:
+        #     description = f"🗑️ {description}"
+        # elif self.classification == HintClassification.useful:
+        #     description = f"🙋 {description}"
 
         embed = {
             "title": title,
             "description": description,
             # "color": self.classification.color,
-            # "footer": {"text": f"Classification: {self.classification.title()}"},
+            # "footer": {"text": f"Hint ID: {self.id}"},
         }
+        if self.classification != HintClassification.unknown:
+            embed["fields"] = [{"name": "Classification", "value": self.classification.title()}]
 
         return embed
 
