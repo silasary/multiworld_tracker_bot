@@ -20,14 +20,16 @@ HintUpdate = CursedStrEnum("HintUpdate", "none new found classified useless")
 @attrs.define()
 class Hint:
     id: int
-    finder_game_id: int
-    receiver_game_id: int
     item: str
     location: str
     entrance: str
     found: bool
     classification: HintClassification
+    finder_game_id: int
+    receiver_game_id: int | None = attrs.field(default=None)
+
     update: HintUpdate = attrs.field(default=HintUpdate.none, init=False)
+    is_finder: bool = attrs.field(default=False)
 
     def embed(self) -> dict:
         if self.update == HintUpdate.new:
@@ -41,17 +43,32 @@ class Hint:
         else:
             title = "Hint"
         receiver = GAMES.get(self.receiver_game_id)
+        finder = GAMES.get(self.finder_game_id)
+
+        if receiver is None:
+            receiver = CheeseGame({'name': "(Item Link)"})
+        if finder is None:
+            finder = CheeseGame()
+
         item = f'{DATAPACKAGES[receiver.game].icon(self.item)} {self.item}'
-        description = f"***{receiver.name}***'s ***{item}*** is at ***{self.location}***"
+        if self.is_finder:
+            description = f"***{receiver.name}***'s ***{item}*** is at ***{self.location}***"
+        else:
+            description = f"***{receiver.name}***'s ***{item}*** is at {finder.name}'s ***{self.location}***"
+
         if self.entrance and self.entrance != "Vanilla":
             description += f" ({self.entrance})"
 
-        return {
+        embed = {
             "title": title,
             "description": description,
             # "color": self.classification.color,
             # "footer": {"text": f"Hint ID: {self.id}"},
         }
+        if self.classification != HintClassification.unknown:
+            embed["fields"] = [{"name": "Classification", "value": self.classification.title()}]
+
+        return embed
 
 
 class ItemClassification(enum.Flag):
@@ -241,10 +258,9 @@ class TrackedGame:
         data = multiworld.hints
         if not data:
             return []
-        # hints = [Hint(**h) for h in data if h["receiver_game_id"] == self.id or h["finder_game_id"] == self.id]
         updated = []
-        finder_hints = [Hint(**h) for h in data if h.get("finder_game_id") == self.id]
-        receiver_hints = [Hint(**h) for h in data if h.get("receiver_game_id") == self.id]
+        finder_hints = [Hint(**h, is_finder=True) for h in data if h.get("finder_game_id") == self.id]
+        receiver_hints = [Hint(**h, is_finder=False) for h in data if h.get("receiver_game_id") == self.id]
         for hint in finder_hints:
             if hint.id not in self.finder_hints:
                 self.finder_hints[hint.id] = hint
@@ -252,13 +268,14 @@ class TrackedGame:
                     hint.update = HintUpdate.new
                     updated.append(hint)
             elif hint.found and not self.finder_hints[hint.id].found:
-                self.finder_hints[hint.id].found = True
+                self.finder_hints[hint.id] = hint
                 self.finder_hints[hint.id].update = HintUpdate.found
                 updated.append(self.finder_hints[hint.id])
             elif hint.classification != self.finder_hints[hint.id].classification:
-                self.finder_hints[hint.id].classification = hint.classification
+                self.finder_hints[hint.id] = hint
                 self.finder_hints[hint.id].update = HintUpdate.classified
                 updated.append(self.finder_hints[hint.id])
+
             if len(updated) == 10:
                 return updated
 
@@ -269,11 +286,11 @@ class TrackedGame:
                     hint.update = HintUpdate.new
                     updated.append(hint)
             elif hint.found and not self.receiver_hints[hint.id].found:
-                self.receiver_hints[hint.id].found = True
+                self.receiver_hints[hint.id] = hint
                 self.receiver_hints[hint.id].update = HintUpdate.found
                 updated.append(self.receiver_hints[hint.id])
             elif hint.classification != self.receiver_hints[hint.id].classification:
-                self.receiver_hints[hint.id].classification = hint.classification
+                self.receiver_hints[hint.id] = hint
                 self.receiver_hints[hint.id].update = HintUpdate.classified
                 updated.append(self.receiver_hints[hint.id])
             if len(updated) == 10:

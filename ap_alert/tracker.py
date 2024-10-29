@@ -19,7 +19,7 @@ from interactions.models.internal.tasks import IntervalTrigger, Task
 from ap_alert.converter import converter
 
 from . import zoggoth
-from .multiworld import (Datapackage, Filters, ItemClassification, Multiworld, NetworkItem, OldDatapackage, ProgressionStatus, TrackedGame)
+from .multiworld import (GAMES, Datapackage, Filters, ItemClassification, Multiworld, NetworkItem, OldDatapackage, ProgressionStatus, TrackedGame)
 
 
 regex_dash = re.compile(r"dash:(\d+)")
@@ -280,7 +280,7 @@ class APTracker(Extension):
         components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji="💼", custom_id=f"inv:{tracker.id}"))
         components.append(Button(style=ButtonStyle.GREY, label="Settings",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
 
-        aged = tracker.last_update and tracker.last_update > datetime.datetime.now() - datetime.timedelta(days=1)
+        aged = (not tracker.last_update) or (tracker.last_update > datetime.datetime.now() - datetime.timedelta(days=1))
         if aged and tracker.progression_status == ProgressionStatus.bk:
             components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
             components.append(Button(style=ButtonStyle.RED, label="Still BK", custom_id=f"bk:{tracker.id}"))
@@ -491,8 +491,12 @@ class APTracker(Extension):
                     logging.error(f"Failed to send message to {player.global_name} ({player.id})")
                     tracker.failures += 1
 
-                # hints = tracker.refresh_hints(multiworld)
                 hints = []
+                try:
+                    hints = tracker.refresh_hints(multiworld)
+                except Exception as e:
+                    sentry_sdk.capture_exception(e)
+                    logging.error(f"Failed to get hints for {tracker.name}")
                 if hints:
                     await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints])
 
@@ -574,6 +578,12 @@ class APTracker(Extension):
                     for dp in flush:
                         self.datapackages[dp].items.clear()
                 os.rename("flush.json", "flushed.json")
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            print(e)
+        try:
+            for mw in self.cheese.values():
+                GAMES.update({g.id: g for g in mw.games.values()})
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
