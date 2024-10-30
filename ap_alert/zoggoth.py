@@ -33,6 +33,9 @@ def update_all(dps: dict[str, Datapackage]) -> None:
 
 def load_datapackage(name: str, dp: Datapackage) -> None:
     logging.info(f"Loading datapackage {name}")
+    if name is None:
+        return
+
     DATAPACKAGES[name] = dp
     if not os.path.exists("zoggoth_repo"):
         clone_repo()
