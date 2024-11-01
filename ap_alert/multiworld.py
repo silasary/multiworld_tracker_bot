@@ -155,6 +155,10 @@ class CheeseGame(dict):
         return datetime.datetime.fromisoformat(self.get("last_activity", "1970-01-01T00:00:00Z"))
 
     @property
+    def last_checked(self) -> datetime.datetime:
+        return datetime.datetime.fromisoformat(self.get("last_checked", "1970-01-01T00:00:00Z"))
+
+    @property
     def name(self) -> str:
         return self.get("name", self.get("position", "Unknown"))
 
@@ -168,13 +172,15 @@ class TrackedGame:
     name: str = None
     game: str = None
     last_refresh: datetime.datetime = None
-    last_update: datetime.datetime = None
+    last_recieved: datetime.datetime = None
     failures: int = 0
     filters: Filters = Filters.unset
 
     last_progression: tuple[str, datetime.datetime] = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
     last_item: tuple[str, datetime.datetime] = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
     progression_status: ProgressionStatus = ProgressionStatus.unknown
+    last_checked: datetime.datetime = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
+    last_activity: datetime.datetime = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
 
     all_items: dict[str, int] = attrs.field(factory=dict, init=False)
     new_items: list[NetworkItem] = attrs.field(factory=list, init=False)
@@ -242,7 +248,7 @@ class TrackedGame:
             return []
 
         self.last_item = (rows[-1][0], datetime.datetime.now())
-        self.last_update = datetime.datetime.now()
+        self.last_recieved = datetime.datetime.now()
 
         self.latest_item = rows[-1][index_order]
         self.new_items = new_items
@@ -260,6 +266,8 @@ class TrackedGame:
         self.game = data.game
         self.id = data.id
         self.progression_status = ProgressionStatus(data.progression_status)
+        self.last_checked = data.last_checked
+        self.last_activity = data.last_activity
 
     def refresh_hints(self, multiworld: "Multiworld") -> list[Hint]:
         data = multiworld.hints

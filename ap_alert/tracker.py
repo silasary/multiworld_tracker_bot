@@ -227,6 +227,7 @@ class APTracker(Extension):
 
     @ap.subcommand("dashboard")
     async def ap_dashboard(self, ctx: SlashContext) -> None:
+        await ctx.defer(ephemeral=True)
         if ctx.author_id not in self.trackers:
             await ctx.send(f"Track a game with {self.ap_track.mention()} first", ephemeral=True)
             return
@@ -270,23 +271,30 @@ class APTracker(Extension):
         embed = Embed(title=name)
         last_check = Timestamp.fromdatetime(tracker.last_refresh).format(TimestampStyles.RelativeTime)
         embed.add_field("Last Refreshed", last_check)
-        last_update = Timestamp.fromdatetime(tracker.last_item[1]).format(TimestampStyles.RelativeTime)
-        embed.add_field("Last Item Recieved", tracker.last_item[0] + " " + last_update)
+        last_item = Timestamp.fromdatetime(tracker.last_item[1]).format(TimestampStyles.RelativeTime)
+        embed.add_field("Last Item Recieved", tracker.last_item[0] + " " + last_item)
         prog_time = Timestamp.fromdatetime(tracker.last_progression[1]).format(TimestampStyles.RelativeTime) if tracker.last_progression[0] else "N/A"
         embed.add_field("Last Progression Item", tracker.last_progression[0] + " " + prog_time)
-        embed.add_field("Progression Status", tracker.progression_status.name)
+        check_time = max(tracker.last_checked, tracker.last_activity)
+        last_checked = Timestamp.fromdatetime(check_time).format(TimestampStyles.RelativeTime)
+        embed.add_field("Progression Status", f'{tracker.progression_status.name} (Last Checked: {last_checked})')
         components = []
 
         components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji="💼", custom_id=f"inv:{tracker.id}"))
         components.append(Button(style=ButtonStyle.GREY, label="Settings",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
 
-        aged = (not tracker.last_update) or (tracker.last_update > datetime.datetime.now() - datetime.timedelta(days=1))
-        if aged and tracker.progression_status == ProgressionStatus.bk:
-            components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
-            components.append(Button(style=ButtonStyle.RED, label="Still BK", custom_id=f"bk:{tracker.id}"))
-        elif aged and tracker.progression_status == ProgressionStatus.soft_bk:
-            components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
-            components.append(Button(style=ButtonStyle.RED, label="Still Soft BK", custom_id=f"bk:{tracker.id}"))
+        aged = check_time < datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=1)
+        if aged:
+            if tracker.progression_status == ProgressionStatus.bk:
+                components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
+                components.append(Button(style=ButtonStyle.RED, label="Still BK", custom_id=f"bk:{tracker.id}"))
+            elif tracker.progression_status == ProgressionStatus.soft_bk:
+                components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
+                components.append(Button(style=ButtonStyle.RED, label="Still Soft BK", custom_id=f"bk:{tracker.id}"))
+            elif tracker.progression_status in [ProgressionStatus.unblocked, ProgressionStatus.unknown]:
+                components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
+                components.append(Button(style=ButtonStyle.RED, label="BK", custom_id=f"bk:{tracker.id}"))
+
 
         return await ctx.send(embed=embed, components=components, ephemeral=True)
 
