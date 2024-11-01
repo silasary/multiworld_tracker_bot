@@ -98,7 +98,10 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
             subprocess.run(["git", "checkout", quoted_name], cwd="zoggoth_repo")
         subprocess.run(["git", "add", f"worlds/{name}/progression.txt"], cwd="zoggoth_repo")
         subprocess.run(["git", "commit", "-m", f"Update {name} progression"], cwd="zoggoth_repo")
-        subprocess.run(["git", "push", "--force", "-u", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
+        if fresh:
+            subprocess.run(["git", "push", "--force", "-u", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
+        else:
+            subprocess.run(["git", "push", "-u", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
         subprocess.run(["git", "checkout", "main"], cwd="zoggoth_repo")
 
 clone_repo()
