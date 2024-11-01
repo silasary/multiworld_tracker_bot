@@ -120,10 +120,10 @@ class APTracker(Extension):
             await self.send_new_items(ctx, tracker, items, ephemeral)
 
         for tracker, items in games.items():
-            await self.try_classify(ctx, tracker, items)
+            await self.try_classify(ctx, tracker, items, ephemeral)
         self.save()
 
-    async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[NetworkItem]) -> None:
+    async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[NetworkItem], ephemeral: bool = False) -> None:
         unclassified = [i.name for i in new_items if i.classification == ItemClassification.unknown]
         for item in unclassified:
             trap = Button(style=ButtonStyle.RED, label="Trap")
@@ -132,7 +132,7 @@ class APTracker(Extension):
             progression = Button(style=ButtonStyle.BLUE, label="Progression")
             msg = await ctx.send(
                 f"[{tracker.game}] What kind of item is {item}?",
-                ephemeral=False,
+                ephemeral=ephemeral,
                 components=[[trap, filler, useful, progression]],
             )
             try:
