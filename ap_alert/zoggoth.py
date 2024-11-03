@@ -49,7 +49,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
             f.write("")
 
     all_keys = set(dp.items.keys())
-    to_append = set(k for k,v in dp.items.items() if v != ItemClassification.unknown)
+    to_append = set(k for k,v in dp.items.items() if v not in [ItemClassification.unknown, ItemClassification.bad_name])
     to_append.discard("Rollback detected!")
 
     trailing_newline = True
@@ -97,7 +97,11 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
             subprocess.run(["git", "branch", "-f", quoted_name], cwd="zoggoth_repo")
             subprocess.run(["git", "checkout", quoted_name], cwd="zoggoth_repo")
         subprocess.run(["git", "add", f"worlds/{name}/progression.txt"], cwd="zoggoth_repo")
-        subprocess.run(["git", "commit", "-m", f"Update {name} progression"], cwd="zoggoth_repo")
+        if len(to_append) < 4:
+            message = f"{name}: Add {', '.join(to_append)}"
+        else:
+            message = f"{name}: Add {len(to_append)} items"
+        subprocess.run(["git", "commit", "-m", message], cwd="zoggoth_repo")
         if fresh:
             subprocess.run(["git", "push", "--force", "-u", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
         else:
