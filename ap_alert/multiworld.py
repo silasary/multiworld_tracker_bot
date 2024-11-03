@@ -179,8 +179,8 @@ class TrackedGame:
     last_progression: tuple[str, datetime.datetime] = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
     last_item: tuple[str, datetime.datetime] = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
     progression_status: ProgressionStatus = ProgressionStatus.unknown
-    last_checked: datetime.datetime = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
-    last_activity: datetime.datetime = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
+    last_checked: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
+    last_activity: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
 
     all_items: dict[str, int] = attrs.field(factory=dict, init=False)
     new_items: list[NetworkItem] = attrs.field(factory=list, init=False)
