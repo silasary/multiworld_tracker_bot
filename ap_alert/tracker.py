@@ -269,14 +269,14 @@ class APTracker(Extension):
             name = name + port
 
         embed = Embed(title=name)
-        last_check = Timestamp.fromdatetime(tracker.last_refresh).format(TimestampStyles.RelativeTime)
+        last_check = format_relative_time(tracker.last_refresh)
         embed.add_field("Last Refreshed", last_check)
-        last_item = Timestamp.fromdatetime(tracker.last_item[1]).format(TimestampStyles.RelativeTime)
+        last_item = format_relative_time(tracker.last_item[1])
         embed.add_field("Last Item Recieved", tracker.last_item[0] + " " + last_item)
-        prog_time = Timestamp.fromdatetime(tracker.last_progression[1]).format(TimestampStyles.RelativeTime) if tracker.last_progression[0] else "N/A"
+        prog_time = format_relative_time(tracker.last_progression[1]) if tracker.last_progression[0] else "N/A"
         embed.add_field("Last Progression Item", tracker.last_progression[0] + " " + prog_time)
         check_time = max(tracker.last_checked, tracker.last_activity)
-        last_checked = Timestamp.fromdatetime(check_time).format(TimestampStyles.RelativeTime)
+        last_checked = format_relative_time(check_time)
         embed.add_field("Progression Status", f'{tracker.progression_status.name} (Last Checked: {last_checked})')
         components = []
 
@@ -616,3 +616,8 @@ async def defer_ephemeral_if_guild(ctx) -> bool:
 def chunk(arr_range, arr_size):
     arr_range = iter(arr_range)
     return iter(lambda: tuple(itertools.islice(arr_range, arr_size)), ())
+
+def format_relative_time(dt):
+    if dt is None or dt == datetime.datetime.min:
+        return ""
+    return Timestamp.fromdatetime(dt).format(TimestampStyles.RelativeTime)
