@@ -514,11 +514,11 @@ class APTracker(Extension):
                 user_count += 1
 
         to_delete = []
-        for room_id, multiwold in self.cheese.items():
-            if multiwold.last_update and datetime.datetime.now(tz=multiwold.last_update.tzinfo) - multiwold.last_update > datetime.timedelta(days=7):
+        for room_id, multiworld in self.cheese.items():
+            if multiworld.last_update and datetime.datetime.now(tz=multiworld.last_update.tzinfo) - multiworld.last_update > datetime.timedelta(days=7):
                 logging.info(f"Removing {room_id} from cheese trackers")
                 to_delete.append(room_id)
-            elif multiwold.last_update is None and datetime.datetime.now() - multiwold.last_check > datetime.timedelta(days=30):
+            elif datetime.datetime.now() - multiworld.last_refreshed > datetime.timedelta(days=30):
                 logging.info(f"Removing {room_id} from cheese trackers")
                 to_delete.append(room_id)
 
