@@ -518,6 +518,9 @@ class APTracker(Extension):
             if multiworld.last_update and datetime.datetime.now(tz=multiworld.last_update.tzinfo) - multiworld.last_update > datetime.timedelta(days=7):
                 logging.info(f"Removing {room_id} from cheese trackers")
                 to_delete.append(room_id)
+            elif not multiworld.last_update and not multiworld.last_refreshed:
+                logging.info(f"Removing {room_id} from cheese trackers")
+                to_delete.append(room_id)
             elif datetime.datetime.now() - multiworld.last_refreshed > datetime.timedelta(days=30):
                 logging.info(f"Removing {room_id} from cheese trackers")
                 to_delete.append(room_id)
