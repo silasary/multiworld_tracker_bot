@@ -16,6 +16,8 @@ OldClassification = enum.Enum("OldClassification", "unknown trap filler useful p
 ProgressionStatus = CursedStrEnum("ProgressionStatus", "unknown bk go soft_bk unblocked")
 HintClassification = CursedStrEnum("HintClassification", "unknown critical useful trash")
 HintUpdate = CursedStrEnum("HintUpdate", "none new found classified useless")
+TrackerStatus = CursedStrEnum("TrackerStatus", "unknown disconnected connected ready playing goal_completed")
+CompletionStatus = CursedStrEnum("CompletionStatus", "unknown incomplete all_checks goal done released")
 
 @attrs.define()
 class Hint:
@@ -30,6 +32,11 @@ class Hint:
 
     update: HintUpdate = attrs.field(default=HintUpdate.none, init=False)
     is_finder: bool = attrs.field(default=False)
+
+    @property
+    def useless(self) -> bool:
+        game = GAMES.get(self.receiver_game_id)
+        return game and game.tracker_status == TrackerStatus.goal_completed
 
     def embed(self) -> dict:
         if self.update == HintUpdate.new:
@@ -149,6 +156,14 @@ class CheeseGame(dict):
     @property
     def progression_status(self) -> str:
         return ProgressionStatus(self.get("progression_status", "unknown"))
+
+    @property
+    def tracker_status(self) -> str:
+        return TrackerStatus(self.get("tracker_status", "unknown"))
+
+    @property
+    def completion_status(self) -> str:
+        return CompletionStatus(self.get("completion_status", "unknown"))
 
     @property
     def last_activity(self) -> datetime.datetime:

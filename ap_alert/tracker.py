@@ -19,7 +19,7 @@ from interactions.models.internal.tasks import IntervalTrigger, Task
 from ap_alert.converter import converter
 
 from . import zoggoth
-from .multiworld import (GAMES, Datapackage, Filters, ItemClassification, Multiworld, NetworkItem, OldDatapackage, ProgressionStatus, TrackedGame)
+from .multiworld import (GAMES, Datapackage, Filters, ItemClassification, Multiworld, NetworkItem, OldDatapackage, ProgressionStatus, TrackedGame, CompletionStatus)
 
 
 regex_dash = re.compile(r"dash:(\d+)")
@@ -390,7 +390,7 @@ class APTracker(Extension):
 
         for game in multiworld.games.values():
             game["url"] = f'https://archipelago.gg/tracker/{room}/0/{game["position"]}'
-            is_game_done = game["checks_done"] == game["checks_total"]
+            is_game_done = game["checks_done"] == game["checks_total"] or game.completion_status == CompletionStatus.done
             is_game_abandoned = multiworld.last_activity() < datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=21)
 
             for t in self.trackers.get(player.id, []):
