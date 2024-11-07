@@ -285,7 +285,8 @@ class TrackedGame:
             elif hint.found and not self.finder_hints[hint.id].found:
                 self.finder_hints[hint.id] = hint
                 self.finder_hints[hint.id].update = HintUpdate.found
-                updated.append(self.finder_hints[hint.id])
+                if not self.finder_hints[hint.id].useless:
+                    updated.append(self.finder_hints[hint.id])
             elif hint.classification != self.finder_hints[hint.id].classification:
                 self.finder_hints[hint.id] = hint
                 self.finder_hints[hint.id].update = HintUpdate.classified
