@@ -269,7 +269,7 @@ class APTracker(Extension):
             name = name + port
 
         embed = Embed(title=name)
-        last_check = format_relative_time(tracker.last_refresh)
+        last_check = format_relative_time(tracker.last_refresh) or "Never"
         embed.add_field("Last Refreshed", last_check)
         last_item = format_relative_time(tracker.last_item[1])
         embed.add_field("Last Item Recieved", tracker.last_item[0] + " " + last_item)
