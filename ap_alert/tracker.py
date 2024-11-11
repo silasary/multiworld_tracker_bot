@@ -9,7 +9,7 @@ import itertools
 import requests
 import sentry_sdk
 from interactions import Activity, ActivityType, Client, ComponentContext, Extension, SlashContext, component_callback, listen, Timestamp, TimestampStyles, spread_to_rows
-from interactions.client.errors import Forbidden
+from interactions.client.errors import Forbidden, NotFound
 from interactions.ext.paginators import Paginator
 from interactions.models.discord import Button, ButtonStyle, User, Embed, Message
 from interactions.models.internal.application_commands import (
@@ -152,7 +152,10 @@ class APTracker(Extension):
             except TimeoutError:
                 await msg.channel.delete_message(msg)
                 break
-            await msg.channel.delete_message(msg)
+            try:
+                await msg.channel.delete_message(msg)
+            except NotFound:
+                pass
             self.save()
 
     async def send_new_items(
