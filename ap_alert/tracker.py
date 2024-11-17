@@ -489,18 +489,19 @@ class APTracker(Extension):
                 urls.add(tracker.url)
                 multiworld = await self.sync_cheese(player, tracker.tracker_id)
                 new_items = tracker.refresh()
-                if not new_items and tracker.failures > 10:
-                    self.remove_tracker(player, tracker.url)
-                    await player.send(f"Tracker {tracker.url} has been removed due to errors")
-                    continue
 
                 try:
+                    if not new_items and tracker.failures > 10:
+                        self.remove_tracker(player, tracker.url)
+                        await player.send(f"Tracker {tracker.url} has been removed due to errors")
+                        continue
                     if new_items:
                         await self.send_new_items(player, tracker, new_items)
                         asyncio.create_task(self.try_classify(player, tracker, new_items))
                 except Forbidden:
                     logging.error(f"Failed to send message to {player.global_name} ({player.id})")
                     tracker.failures += 1
+                    continue
 
                 hints = []
                 try:
@@ -508,8 +509,13 @@ class APTracker(Extension):
                 except Exception as e:
                     sentry_sdk.capture_exception(e)
                     logging.error(f"Failed to get hints for {tracker.name}")
-                if hints:
-                    await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints])
+                try:
+                    if hints:
+                        await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints])
+                except Forbidden:
+                    logging.error(f"Failed to send message to {player.global_name} ({player.id})")
+                    tracker.failures += 1
+                    continue
 
                 tracker_count += 1
                 await asyncio.sleep(5)
