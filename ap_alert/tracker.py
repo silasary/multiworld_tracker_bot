@@ -429,8 +429,8 @@ class APTracker(Extension):
                 tracker.update(game)
 
                 if is_game_done:
-                    await player.send(f"Game {tracker.name} is complete")
                     self.remove_tracker(player, tracker.url)
+                    await player.send(f"Game {tracker.name} is complete")
                     continue
 
                 if is_game_abandoned:
