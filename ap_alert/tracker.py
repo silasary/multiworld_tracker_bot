@@ -60,7 +60,7 @@ class APTracker(Extension):
             await ctx.send("I can't send you DMs, please enable them so I can notify you when you get new items.", ephemeral=True)
             return
 
-        await defer_ephemeral_if_guild(ctx)
+        ephemeral = await defer_ephemeral_if_guild(ctx)
 
         if url.split("/")[-1].isnumeric():
             # Track slot
@@ -77,6 +77,7 @@ class APTracker(Extension):
                 self.save()
 
             room, multiworld = await self.url_to_multiworld('/'.join(url.split("/")[:-2]))
+            await ctx.send(f"Setting up tracker for https://archipelago.gg/tracker/{room}...", ephemeral=ephemeral)
             await multiworld.refresh()
             slot = multiworld.games[int(url.split("/")[-1])]
             tracker.game = slot["game"]
