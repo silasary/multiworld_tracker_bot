@@ -156,6 +156,8 @@ class APTracker(Extension):
                 await msg.channel.delete_message(msg)
             except NotFound:
                 pass
+            except Forbidden:
+                pass
             self.save()
 
     async def send_new_items(
