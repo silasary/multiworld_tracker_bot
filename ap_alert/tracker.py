@@ -95,7 +95,7 @@ class APTracker(Extension):
             await self.ap_refresh(ctx)
         else:
             # Track cheese room
-            found = await self.sync_cheese(ctx.author, url)
+            _mw, found = await self.sync_cheese(ctx.author, url)
             if not found:
                 await ctx.send("This is a multiworld tracker, please click provide the slot tracker URL by clicking the number next to your slot", ephemeral=True)
                 return
@@ -415,7 +415,7 @@ class APTracker(Extension):
         tracker.filters = Filters(int(m.group(2)))
         await ctx.send("Filter updated", ephemeral=True)
 
-    async def sync_cheese(self, player: User, room: str) -> bool:
+    async def sync_cheese(self, player: User, room: str) -> tuple[Multiworld, bool]:
         room, multiworld = await self.url_to_multiworld(room)
         found_tracker = False
 
@@ -471,7 +471,7 @@ class APTracker(Extension):
                     continue
                 found_tracker = True
 
-        return found_tracker
+        return multiworld, found_tracker
 
     async def url_to_multiworld(self, room):
         if 'cheesetrackers' in room:
@@ -521,7 +521,7 @@ class APTracker(Extension):
                     self.save()
                     continue
                 urls.add(tracker.url)
-                multiworld = await self.sync_cheese(player, tracker.tracker_id)
+                multiworld, _found = await self.sync_cheese(player, tracker.tracker_id)
                 new_items = tracker.refresh()
 
                 try:
