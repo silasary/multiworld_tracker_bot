@@ -24,6 +24,7 @@ from .multiworld import (GAMES, Datapackage, Filters, ItemClassification, Multiw
 
 regex_dash = re.compile(r"dash:(\d+)")
 regex_unblock = re.compile(r"unblock:(\d+)")
+regex_remove = re.compile(r"remove:(\d+)")
 regex_bk = re.compile(r"bk:(\d+)")
 regex_inv = re.compile(r"inv:(\d+)")
 regex_settings = re.compile(r"settings:(\d+)")
@@ -289,8 +290,10 @@ class APTracker(Extension):
         components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji="💼", custom_id=f"inv:{tracker.id}"))
         components.append(Button(style=ButtonStyle.GREY, label="Settings",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
 
+        is_owner = multiworld.games[tracker.slot_id].get("effective_discord_username") == ctx.author.username
+
         aged = check_time < datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=1)
-        if aged:
+        if aged and is_owner:
             if tracker.progression_status == ProgressionStatus.bk:
                 components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
                 components.append(Button(style=ButtonStyle.RED, label="Still BK", custom_id=f"bk:{tracker.id}"))
@@ -301,8 +304,22 @@ class APTracker(Extension):
                 components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
                 components.append(Button(style=ButtonStyle.RED, label="BK", custom_id=f"bk:{tracker.id}"))
 
+        if not is_owner:
+            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji="🗑️", custom_id=f"remove:{tracker.id}"))
+
 
         return await ctx.send(embed=embed, components=components, ephemeral=True)
+
+    @component_callback(regex_remove)
+    async def remove(self, ctx: ComponentContext) -> None:
+        await ctx.defer(ephemeral=True)
+        m = regex_remove.match(ctx.custom_id)
+        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        if tracker is None:
+            return
+        self.trackers[ctx.author_id].remove(tracker)
+        await ctx.send("Tracker removed", ephemeral=True)
+        self.save()
 
     @component_callback(regex_unblock)
     async def unblock(self, ctx: ComponentContext) -> None:
