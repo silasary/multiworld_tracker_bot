@@ -36,6 +36,7 @@ class APTracker(Extension):
         self.trackers: dict[int, list[TrackedGame]] = {}
         self.cheese: dict[str, Multiworld] = {}
         self.datapackages: dict[str, Datapackage] = {}
+        self.tracker_count = 0
         self.load()
         zoggoth.update_all(self.datapackages)
 
@@ -563,7 +564,10 @@ class APTracker(Extension):
 
                 tracker_count += 1
                 progress += 1
-                await asyncio.sleep(5)
+                if self.tracker_count > 720:
+                    await asyncio.sleep(3) # three doesn't go into 3600 evenly, so overflows will be spread out
+                else:
+                    await asyncio.sleep(5)
             if trackers:
                 user_count += 1
             if progress > 10:
@@ -585,6 +589,7 @@ class APTracker(Extension):
         for room_id in to_delete:
             del self.cheese[room_id]
 
+        self.tracker_count = tracker_count
         self.save()
         activity = Activity(name=f"{tracker_count} slots across {user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
@@ -607,6 +612,8 @@ class APTracker(Extension):
         dp = json.dumps(converter.unstructure(self.datapackages), indent=2)
         with open("gamedata.json", "w") as f:
             f.write(dp)
+        with open("stats.json", "w") as f:
+            f.write(json.dumps({"tracker_count": self.tracker_count}, indent=2))
 
     def load(self):
         if os.path.exists("trackers.json"):
@@ -652,6 +659,14 @@ class APTracker(Extension):
         try:
             for mw in self.cheese.values():
                 GAMES.update({g.id: g for g in mw.games.values()})
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            print(e)
+        try:
+            if os.path.exists("stats.json"):
+                with open("stats.json") as f:
+                    stats = json.loads(f.read())
+                    self.tracker_count = stats.get("tracker_count", 0)
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
