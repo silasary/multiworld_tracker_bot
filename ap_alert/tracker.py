@@ -282,12 +282,13 @@ class APTracker(Extension):
         if tracker is None:
             return Embed(title="Game not found")
 
-        multiworld = self.cheese[tracker.tracker_id]
+        multiworld = self.cheese.get(tracker.tracker_id)
 
         name = tracker.name
-        port = f' ({multiworld.last_port})' if multiworld.last_port else ''
-        if not name.endswith(port):
-            name = name + port
+        if multiworld:
+            port = f' ({multiworld.last_port})' if multiworld.last_port else ''
+            if not name.endswith(port):
+                name = name + port
 
         embed = Embed(title=name)
         last_check = format_relative_time(tracker.last_refresh) or "Never"
@@ -304,8 +305,12 @@ class APTracker(Extension):
         components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji="💼", custom_id=f"inv:{tracker.id}"))
         components.append(Button(style=ButtonStyle.GREY, label="Settings",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
 
-        is_owner = multiworld.games[tracker.slot_id].get("effective_discord_username") == ctx.author.username
-        only_game = len([g for g in multiworld.games.values() if g.get("effective_discord_username") == ctx.author.username]) == 1
+        if multiworld:
+            is_owner = multiworld.games[tracker.slot_id].get("effective_discord_username") == ctx.author.username
+            only_game = len([g for g in multiworld.games.values() if g.get("effective_discord_username") == ctx.author.username]) == 1
+        else:
+            is_owner = False
+            only_game = True
 
         # aged = check_time < datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=1)
         if is_owner:
