@@ -502,6 +502,7 @@ class APTracker(Extension):
     async def refresh_all(self) -> None:
         user_count = 0
         tracker_count = 0
+        progress = 0
 
         for user, trackers in self.trackers.copy().items():
             player = await self.bot.fetch_user(user)
@@ -545,9 +546,13 @@ class APTracker(Extension):
                     continue
 
                 tracker_count += 1
+                progress += 1
                 await asyncio.sleep(5)
             if trackers:
                 user_count += 1
+            if progress > 10:
+                self.save()
+                progress = 0
 
         to_delete = []
         for room_id, multiworld in self.cheese.items():
