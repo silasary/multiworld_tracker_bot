@@ -136,6 +136,9 @@ class APTracker(Extension):
         self.save()
 
     async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[NetworkItem], ephemeral: bool = False) -> None:
+        if tracker.game is None:
+            return
+
         unclassified = [i.name for i in new_items if i.classification == ItemClassification.unknown]
         for item in unclassified:
             trap = Button(style=ButtonStyle.RED, label="Trap")
