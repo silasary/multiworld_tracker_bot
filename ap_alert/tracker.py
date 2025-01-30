@@ -142,11 +142,11 @@ class APTracker(Extension):
 
         unclassified = [i.name for i in new_items if i.classification == ItemClassification.unknown]
         for item in unclassified:
-            trap = Button(style=ButtonStyle.RED, label="Trap")
-            filler = Button(style=ButtonStyle.GREY, label="Filler")
-            useful = Button(style=ButtonStyle.GREEN, label="Useful")
-            progression = Button(style=ButtonStyle.BLUE, label="Progression")
-            mcguffin = Button(style=ButtonStyle.BLUE, label="McGuffin")
+            trap = Button(style=ButtonStyle.RED, label="Trap", emoji="❌")
+            filler = Button(style=ButtonStyle.GREY, label="Filler", emoji="<:filler:1277502385459171338>")
+            useful = Button(style=ButtonStyle.GREEN, label="Useful", emoji="<:useful:1277502389729103913>")
+            progression = Button(style=ButtonStyle.BLUE, label="Progression", emoji="<:progression:1277502382682542143>")
+            mcguffin = Button(style=ButtonStyle.BLUE, label="McGuffin", emoji="✨")
             msg = await ctx.send(
                 f"[{tracker.game}] What kind of item is {item}?",
                 ephemeral=ephemeral,
@@ -414,7 +414,8 @@ class APTracker(Extension):
         components.append(filter_button("Filter: Nothing", Filters.none))
         components.append(filter_button("Filter: Everything", Filters.everything))
         components.append(filter_button("Filter: Useful+", Filters.useful_plus))
-        components.append(filter_button("Filter: Progression", Filters.progression_plus))
+        components.append(filter_button("Filter: Progression", Filters.progression))
+        components.append(filter_button("Filter: Prog+McGuffins", Filters.progression_plus))
 
         await ctx.send(embed=embed, components=spread_to_rows(*components))
 
