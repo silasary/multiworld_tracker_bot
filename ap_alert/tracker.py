@@ -298,9 +298,10 @@ class APTracker(Extension):
         components.append(Button(style=ButtonStyle.GREY, label="Settings",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
 
         is_owner = multiworld.games[tracker.slot_id].get("effective_discord_username") == ctx.author.username
+        only_game = len([g for g in multiworld.games.values() if g.get("effective_discord_username") == ctx.author.username]) == 1
 
-        aged = check_time < datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=1)
-        if aged and is_owner:
+        # aged = check_time < datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=1)
+        if is_owner:
             if tracker.progression_status == ProgressionStatus.bk:
                 components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
                 components.append(Button(style=ButtonStyle.RED, label="Still BK", custom_id=f"bk:{tracker.id}"))
@@ -311,7 +312,7 @@ class APTracker(Extension):
                 components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
                 components.append(Button(style=ButtonStyle.RED, label="BK", custom_id=f"bk:{tracker.id}"))
 
-        if not is_owner:
+        if not is_owner or only_game:
             components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji="🗑️", custom_id=f"remove:{tracker.id}"))
 
 
