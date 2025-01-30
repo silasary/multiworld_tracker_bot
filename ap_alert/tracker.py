@@ -289,7 +289,7 @@ class APTracker(Extension):
         last_check = format_relative_time(tracker.last_refresh) or "Never"
         embed.add_field("Last Refreshed", last_check)
         last_item = format_relative_time(tracker.last_item[1]) if tracker.last_item[0] else "N/A"
-        embed.add_field("Last Item Recieved", tracker.last_item[0] + " " + last_item)
+        embed.add_field("Last Item Received", tracker.last_item[0] + " " + last_item)
         prog_time = format_relative_time(tracker.last_progression[1]) if tracker.last_progression[0] else "N/A"
         embed.add_field("Last Progression Item", tracker.last_progression[0] + " " + prog_time)
         check_time = max(tracker.last_checked, tracker.last_activity)
