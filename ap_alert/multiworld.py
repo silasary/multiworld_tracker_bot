@@ -363,6 +363,9 @@ class Multiworld:
 
 
     def last_activity(self) -> datetime.datetime:
+        """
+        Return the last activity time of any game in the multiworld.
+        """
         return max(g.last_activity for g in self.games.values())
 
     def put(self, game: CheeseGame) -> None:

@@ -276,6 +276,7 @@ class APTracker(Extension):
 
     @component_callback(regex_dash)
     async def dashboard_embed(self, ctx: ComponentContext) -> Embed:
+        await ctx.defer(ephemeral=True)
         m = regex_dash.match(ctx.custom_id)
         tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
         if tracker is None:
@@ -425,11 +426,11 @@ class APTracker(Extension):
         await multiworld.refresh()
         self.cheese[room] = multiworld
         age = datetime.datetime.now(tz=datetime.timezone.utc) - multiworld.last_update
+        is_mw_abandoned = multiworld.last_activity() < datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)
 
         for game in multiworld.games.values():
             game["url"] = f'https://archipelago.gg/tracker/{room}/0/{game["position"]}'
-            is_game_done = game["checks_done"] == game["checks_total"] or game.completion_status == CompletionStatus.done
-            is_game_abandoned = multiworld.last_activity() < datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=21)
+            is_game_done = game["checks_done"] == game["checks_total"] and game.completion_status in [CompletionStatus.done, CompletionStatus.released]
 
             for t in self.trackers.get(player.id, []):
                 if t.url == game["url"]:
@@ -447,7 +448,7 @@ class APTracker(Extension):
                     self.trackers[player.id] = []
 
                 if tracker is None:
-                    if is_game_done or age > datetime.timedelta(days=1) or is_game_abandoned:
+                    if is_game_done or age > datetime.timedelta(days=1) or is_mw_abandoned:
                         continue
 
                     tracker = TrackedGame(game["url"])
@@ -468,8 +469,9 @@ class APTracker(Extension):
                     await player.send(f"Game {tracker.name} is complete")
                     continue
 
-                if is_game_abandoned:
-                    # await player.send(f"Game {tracker.name} has finished")
+                if is_mw_abandoned:
+                    last_check = format_relative_time(multiworld.last_activity())
+                    await player.send(f"Game {tracker.name} has stalled, the last check in the multiworld was {last_check}. Removing tracker.")
                     self.remove_tracker(player, tracker.url)
                     continue
                 found_tracker = True
