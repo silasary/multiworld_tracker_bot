@@ -61,6 +61,13 @@ class APTracker(Extension):
             await ctx.send("I can't send you DMs, please enable them so I can notify you when you get new items.", ephemeral=True)
             return
 
+        if '/room/' in url:
+            await ctx.send("Please use the tracker URL, not the room URL", ephemeral=True)
+            return
+        if re.match(r'^archipelago.gg:\d+$', url):
+            await ctx.send("Please use the tracker URL, not the port number", ephemeral=True)
+            return
+
         ephemeral = await defer_ephemeral_if_guild(ctx)
 
         if url.split("/")[-1].isnumeric():
