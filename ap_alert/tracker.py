@@ -146,10 +146,11 @@ class APTracker(Extension):
             filler = Button(style=ButtonStyle.GREY, label="Filler")
             useful = Button(style=ButtonStyle.GREEN, label="Useful")
             progression = Button(style=ButtonStyle.BLUE, label="Progression")
+            mcguffin = Button(style=ButtonStyle.BLUE, label="McGuffin")
             msg = await ctx.send(
                 f"[{tracker.game}] What kind of item is {item}?",
                 ephemeral=ephemeral,
-                components=[[trap, filler, useful, progression]],
+                components=[[trap, filler, useful, progression, mcguffin]],
             )
             try:
                 chosen = await self.bot.wait_for_component(msg, timeout=3600)
@@ -161,6 +162,8 @@ class APTracker(Extension):
                     classification = ItemClassification.progression
                 elif chosen.ctx.custom_id == trap.custom_id:
                     classification = ItemClassification.trap
+                elif chosen.ctx.custom_id == mcguffin.custom_id:
+                    classification = ItemClassification.mcguffin
                 else:
                     print(f"wat: {chosen.ctx.custom_id}")
                 self.datapackages[tracker.game].items[item] = classification
