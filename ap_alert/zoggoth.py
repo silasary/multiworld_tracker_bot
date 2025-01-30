@@ -93,7 +93,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
 
     if written:
         quoted_name = name.replace(" ", "_")
-        if len(to_append) > 10:
+        if len(to_append) >= 5:
             fresh = False
         if fresh:
             subprocess.run(["git", "branch", "-f", quoted_name], cwd="zoggoth_repo")
