@@ -95,7 +95,10 @@ class APTracker(Extension):
             await self.ap_refresh(ctx)
         else:
             # Track cheese room
-            await self.sync_cheese(ctx.author, url)
+            found = await self.sync_cheese(ctx.author, url)
+            if not found:
+                await ctx.send("This is a multiworld tracker, please click provide the slot tracker URL by clicking the number next to your slot", ephemeral=True)
+                return
             await self.ap_refresh(ctx)
 
     def check_for_dp(self, tracker):
@@ -285,7 +288,7 @@ class APTracker(Extension):
         embed = Embed(title=name)
         last_check = format_relative_time(tracker.last_refresh) or "Never"
         embed.add_field("Last Refreshed", last_check)
-        last_item = format_relative_time(tracker.last_item[1])
+        last_item = format_relative_time(tracker.last_item[1]) if tracker.last_item[0] else "N/A"
         embed.add_field("Last Item Recieved", tracker.last_item[0] + " " + last_item)
         prog_time = format_relative_time(tracker.last_progression[1]) if tracker.last_progression[0] else "N/A"
         embed.add_field("Last Progression Item", tracker.last_progression[0] + " " + prog_time)
@@ -412,8 +415,9 @@ class APTracker(Extension):
         tracker.filters = Filters(int(m.group(2)))
         await ctx.send("Filter updated", ephemeral=True)
 
-    async def sync_cheese(self, player: User, room: str) -> Multiworld:
+    async def sync_cheese(self, player: User, room: str) -> bool:
         room, multiworld = await self.url_to_multiworld(room)
+        found_tracker = False
 
         await multiworld.refresh()
         self.cheese[room] = multiworld
@@ -465,8 +469,9 @@ class APTracker(Extension):
                     # await player.send(f"Game {tracker.name} has finished")
                     self.remove_tracker(player, tracker.url)
                     continue
+                found_tracker = True
 
-        return multiworld
+        return found_tracker
 
     async def url_to_multiworld(self, room):
         if 'cheesetrackers' in room:
