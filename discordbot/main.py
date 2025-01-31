@@ -19,6 +19,7 @@ class Bot(interactions.Client):
             sync_interactions=True,
             sync_ext=True,
             send_command_tracebacks=False,
+            dm_channels={},
         )
         super().load_extension(
             "interactions.ext.sentry",
