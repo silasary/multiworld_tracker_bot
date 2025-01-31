@@ -47,6 +47,8 @@ class APTracker(Extension):
         self.refresh_all.trigger.last_call_time = datetime.datetime.now() - datetime.timedelta(hours=1)
         zoggoth.update_datapackage.start()
         # await zoggoth.update_datapackage()
+        activity = Activity(name=f"{self.tracker_count} slots across {self.user_count} users", type=ActivityType.WATCHING)
+        await self.bot.change_presence(activity=activity)
 
     @slash_command("ap")
     @integration_types(guild=True, user=True)
@@ -620,6 +622,7 @@ class APTracker(Extension):
             del self.cheese[room_id]
 
         self.tracker_count = tracker_count
+        self.user_count = user_count
         self.save()
         activity = Activity(name=f"{tracker_count} slots across {user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
@@ -643,7 +646,7 @@ class APTracker(Extension):
         with open("gamedata.json", "w") as f:
             f.write(dp)
         with open("stats.json", "w") as f:
-            f.write(json.dumps({"tracker_count": self.tracker_count}, indent=2))
+            f.write(json.dumps({"tracker_count": self.tracker_count, "user_count": self.user_count}, indent=2))
 
     def load(self):
         if os.path.exists("trackers.json"):
@@ -697,6 +700,7 @@ class APTracker(Extension):
                 with open("stats.json") as f:
                     stats = json.loads(f.read())
                     self.tracker_count = stats.get("tracker_count", 0)
+                    self.user_count = stats.get("user_count", 0)
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
