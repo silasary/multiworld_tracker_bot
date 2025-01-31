@@ -360,7 +360,7 @@ class Multiworld:
     last_refreshed: datetime.datetime = None
     last_update: datetime.datetime = None
     upstream_url: str = None
-    room_url: str = None
+    room_link: str = None
     last_port: Optional[int] = None
     hints: list[dict] | None = None
 
@@ -378,7 +378,7 @@ class Multiworld:
         GAMES.update({g.id: g for g in self.games.values()})
         self.last_update = datetime.datetime.fromisoformat(data.get("updated_at"))
         self.upstream_url = data.get("upstream_url")
-        self.room_url = data.get("room_url")
+        self.room_link	 = data.get("room_link")
         self.last_port = data.get("last_port")
         self.hints = data.get("hints", [])
 

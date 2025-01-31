@@ -311,6 +311,8 @@ class APTracker(Extension):
 
         components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji="💼", custom_id=f"inv:{tracker.id}"))
         components.append(Button(style=ButtonStyle.GREY, label="Settings",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
+        if multiworld and multiworld.room_link:
+            components.append(Button(style=ButtonStyle.URL, label="Open Room", url=multiworld.room_link))
 
         if multiworld:
             is_owner = multiworld.games[tracker.slot_id].get("effective_discord_username") == ctx.author.username
