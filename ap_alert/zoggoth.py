@@ -51,6 +51,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
     all_keys = set(dp.items.keys())
     to_append = set(k for k,v in dp.items.items() if v not in [ItemClassification.unknown, ItemClassification.bad_name])
     to_append.discard("Rollback detected!")
+    to_replace = set()
 
     trailing_newline = True
     fresh = True
@@ -70,7 +71,9 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
 
             to_append.discard(key)
             if value == "unknown":
-                logging.info(f"Zoggoth doesn't know the classification for item {key} in {name}.")
+                # logging.info(f"Zoggoth doesn't know the classification for item {key} in {name}.")
+                if key in dp.items:
+                    to_replace.add(key)
                 continue
             elif value in classifications:
                 dp.items[key] = classifications[value]
@@ -80,6 +83,22 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
             trailing_newline = line.endswith("\n")
 
     written = False
+    if to_replace:
+        with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "r") as f:
+            lines = f.readlines()
+        with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "w") as f:
+            for line in lines:
+                if not line.strip():
+                    f.write("\n")
+                    continue
+                splits = line.split(": ")
+                key = ": ".join(splits[:-1])
+                if key in to_replace:
+                    v = dp.items[key]
+                    f.write(f"{key}: {v.name}\n")
+                else:
+                    f.write(line)
+            written = True
     if to_append:
         with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "a") as f:
             if not trailing_newline:
@@ -93,6 +112,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
 
     if written:
         quoted_name = name.replace(" ", "_")
+        to_append = to_append | to_replace
         if len(to_append) >= 5:
             fresh = False
         if fresh:
