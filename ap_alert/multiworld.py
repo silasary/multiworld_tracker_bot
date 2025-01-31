@@ -249,7 +249,7 @@ class TrackedGame:
         index_amount = headers.index("Amount")
         index_item = headers.index("Item")
 
-        self.last_refresh = datetime.datetime.now()
+        self.last_refresh = datetime.datetime.now(tz=datetime.timezone.utc)
         rows.sort(key=lambda r: r[index_order])
         if rows[-1][index_order] < self.latest_item:
             self.latest_item = -1
@@ -267,13 +267,13 @@ class TrackedGame:
                 if DATAPACKAGES.get(self.game) is not None:
                     classification = DATAPACKAGES[self.game].items.get(r[0])
                     if classification in [ItemClassification.progression, ItemClassification.mcguffin]:
-                        self.last_progression = (r[0], datetime.datetime.now())
+                        self.last_progression = (r[0], datetime.datetime.now(tz=datetime.UTC))
 
         if is_up_to_date:
             return []
 
-        self.last_item = (rows[-1][0], datetime.datetime.now())
-        self.last_recieved = datetime.datetime.now()
+        self.last_item = (rows[-1][0], datetime.datetime.now(tz=datetime.UTC))
+        self.last_recieved = datetime.datetime.now(tz=datetime.UTC)
 
         self.latest_item = rows[-1][index_order]
         self.new_items = new_items
@@ -365,9 +365,9 @@ class Multiworld:
     hints: list[dict] | None = None
 
     async def refresh(self, force: bool = False) -> None:
-        if self.last_refreshed and datetime.datetime.now() - self.last_refreshed < datetime.timedelta(hours=1) and not force:
+        if self.last_refreshed and self.last_refreshed.tzinfo is not None and datetime.datetime.now(tz=datetime.UTC) - self.last_refreshed < datetime.timedelta(hours=1) and not force:
             return
-        self.last_refreshed = datetime.datetime.now()
+        self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
 
         logging.info(f"Refreshing {self.url}")
         data = requests.get(self.url).text

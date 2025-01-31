@@ -44,7 +44,7 @@ class APTracker(Extension):
     @listen()
     async def on_startup(self) -> None:
         self.refresh_all.start()
-        self.refresh_all.trigger.last_call_time = datetime.datetime.now() - datetime.timedelta(hours=1)
+        self.refresh_all.trigger.last_call_time = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=1)
         zoggoth.update_datapackage.start()
         # await zoggoth.update_datapackage()
         activity = Activity(name=f"{self.tracker_count} slots across {self.user_count} users", type=ActivityType.WATCHING)
@@ -564,7 +564,11 @@ class APTracker(Extension):
                     continue
                 urls.add(tracker.url)
                 multiworld, _found = await self.sync_cheese(player, tracker.tracker_id)
-                new_items = tracker.refresh()
+                should_check = tracker.last_refresh is None or tracker.last_refresh.tzinfo is None or multiworld.last_activity() > tracker.last_refresh or datetime.datetime.now(tz=datetime.UTC) - tracker.last_checked > datetime.timedelta(hours=3)
+                if should_check:
+                    new_items = tracker.refresh()
+                else:
+                    new_items = []
 
                 try:
                     if not new_items and tracker.failures > 10:
@@ -598,10 +602,12 @@ class APTracker(Extension):
 
                 tracker_count += 1
                 progress += 1
-                if self.tracker_count > 720:
-                    await asyncio.sleep(3) # three doesn't go into 3600 evenly, so overflows will be spread out
-                else:
-                    await asyncio.sleep(5)
+                if should_check:
+                    # if we didn't check anything, we don't need to wait
+                    if self.tracker_count > 720:
+                        await asyncio.sleep(3) # three doesn't go into 3600 evenly, so overflows will be spread out
+                    else:
+                        await asyncio.sleep(5)
             if trackers:
                 user_count += 1
             if progress > 10:
@@ -616,7 +622,10 @@ class APTracker(Extension):
             elif not multiworld.last_update and not multiworld.last_refreshed:
                 logging.info(f"Removing {room_id} from cheese trackers")
                 to_delete.append(room_id)
-            elif datetime.datetime.now() - multiworld.last_refreshed > datetime.timedelta(days=30):
+            elif datetime.datetime.now(tz=multiworld.last_refreshed.tzinfo) - multiworld.last_refreshed > datetime.timedelta(days=30):
+                logging.info(f"Removing {room_id} from cheese trackers")
+                to_delete.append(room_id)
+            elif multiworld.last_activity() < datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30):
                 logging.info(f"Removing {room_id} from cheese trackers")
                 to_delete.append(room_id)
 
