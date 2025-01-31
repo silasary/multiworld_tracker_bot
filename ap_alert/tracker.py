@@ -19,7 +19,7 @@ from interactions.models.internal.tasks import IntervalTrigger, Task
 from ap_alert.converter import converter
 
 from . import zoggoth
-from .multiworld import (GAMES, Datapackage, Filters, ItemClassification, Multiworld, NetworkItem, OldDatapackage, ProgressionStatus, TrackedGame, CompletionStatus)
+from .multiworld import (GAMES, Datapackage, Filters, HintFilters, ItemClassification, Multiworld, NetworkItem, OldDatapackage, ProgressionStatus, TrackedGame, CompletionStatus)
 
 
 regex_dash = re.compile(r"dash:(\d+)")
@@ -29,6 +29,7 @@ regex_bk = re.compile(r"bk:(\d+)")
 regex_inv = re.compile(r"inv:(\d+)")
 regex_settings = re.compile(r"settings:(\d+)")
 regex_filter = re.compile(r"filter:(\d+):(\d+)")
+regex_hint_filter = re.compile(r"hint_filter:(\d+):(\d+)")
 
 class APTracker(Extension):
     def __init__(self, bot: Client) -> None:
@@ -411,11 +412,21 @@ class APTracker(Extension):
             if value == tracker.filters:
                 colour = ButtonStyle.GREEN
             return Button(style=colour, label=name, custom_id=f"filter:{tracker.id}:{value.value}")
+        def hint_filter_button(name: str, value: Filters):
+            colour = ButtonStyle.GREY
+            if value == tracker.hint_filters:
+                colour = ButtonStyle.GREEN
+            return Button(style=colour, label=name, custom_id=f"hint_filter:{tracker.id}:{value.value}")
         components.append(filter_button("Filter: Nothing", Filters.none))
         components.append(filter_button("Filter: Everything", Filters.everything))
         components.append(filter_button("Filter: Useful+", Filters.useful_plus))
         components.append(filter_button("Filter: Progression", Filters.progression))
         components.append(filter_button("Filter: Prog+McGuffins", Filters.progression_plus))
+        ### Second row
+        components.append(hint_filter_button("Hint Filter: Nothing", HintFilters.none))
+        components.append(hint_filter_button("Hint Filter: Everything", HintFilters.all))
+        components.append(hint_filter_button("Hint Filter: Received", HintFilters.finder))
+        components.append(hint_filter_button("Hint Filter: Sent", HintFilters.receiver))
 
         await ctx.send(embed=embed, components=spread_to_rows(*components))
 
@@ -428,6 +439,18 @@ class APTracker(Extension):
             return
         tracker.filters = Filters(int(m.group(2)))
         await ctx.send("Filter updated", ephemeral=True)
+        self.save()
+
+    @component_callback(regex_hint_filter)
+    async def hint_filter(self, ctx: ComponentContext) -> None:
+        await ctx.defer(ephemeral=True)
+        m = regex_hint_filter.match(ctx.custom_id)
+        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        if tracker is None:
+            return
+        tracker.hint_filters = HintFilters(int(m.group(2)))
+        await ctx.send("Hint filter updated", ephemeral=True)
+        self.save()
 
     async def sync_cheese(self, player: User, room: str) -> tuple[Multiworld, bool]:
         room, multiworld = await self.url_to_multiworld(room)
@@ -560,7 +583,10 @@ class APTracker(Extension):
                     logging.error(f"Failed to get hints for {tracker.name}")
                 try:
                     if hints:
-                        await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints])
+                        components = []
+                        if tracker.hint_filters == HintFilters.unset:
+                            components.append(Button(style=ButtonStyle.GREY, label="Configure Hint Filters",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
+                        await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints], components=components)
                 except Forbidden:
                     logging.error(f"Failed to send message to {player.global_name} ({player.id})")
                     tracker.failures += 1

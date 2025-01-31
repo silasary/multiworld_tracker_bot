@@ -110,6 +110,14 @@ class Filters(enum.Flag):
     progression_plus = progression | mcguffin
 
 
+class HintFilters(enum.Flag):
+    none = 0
+    receiver = 1
+    finder = 2
+    unset = 4
+
+    all = receiver | finder
+
 @attrs.define()
 class NetworkItem:
     name: str
@@ -191,6 +199,7 @@ class TrackedGame:
     last_recieved: datetime.datetime = None
     failures: int = 0
     filters: Filters = Filters.unset
+    hint_filters: HintFilters = HintFilters.unset
 
     last_progression: tuple[str, datetime.datetime] = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
     last_item: tuple[str, datetime.datetime] = attrs.field(factory=lambda: ("", datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")))
@@ -289,6 +298,11 @@ class TrackedGame:
         data = multiworld.hints
         if not data:
             return []
+        filters = self.hint_filters
+        if filters == HintFilters.none:
+            return []
+        elif filters == HintFilters.unset:
+            filters = HintFilters.all
         updated = []
         finder_hints = [Hint(**h, is_finder=True) for h in data if h.get("finder_game_id") == self.id]
         receiver_hints = [Hint(**h, is_finder=False) for h in data if h.get("receiver_game_id") == self.id]
@@ -297,16 +311,19 @@ class TrackedGame:
                 self.finder_hints[hint.id] = hint
                 if not hint.found:
                     hint.update = HintUpdate.new
-                    updated.append(hint)
+                    if filters & HintFilters.finder:
+                        updated.append(hint)
             elif hint.found and not self.finder_hints[hint.id].found:
                 self.finder_hints[hint.id] = hint
                 self.finder_hints[hint.id].update = HintUpdate.found
                 if not self.finder_hints[hint.id].useless:
-                    updated.append(self.finder_hints[hint.id])
+                    if filters & HintFilters.finder:
+                        updated.append(self.finder_hints[hint.id])
             elif hint.classification != self.finder_hints[hint.id].classification:
                 self.finder_hints[hint.id] = hint
                 self.finder_hints[hint.id].update = HintUpdate.classified
-                updated.append(self.finder_hints[hint.id])
+                if filters & HintFilters.finder:
+                    updated.append(self.finder_hints[hint.id])
 
             if len(updated) == 10:
                 return updated
@@ -316,15 +333,18 @@ class TrackedGame:
                 self.receiver_hints[hint.id] = hint
                 if not hint.found:
                     hint.update = HintUpdate.new
-                    updated.append(hint)
+                    if filters & HintFilters.receiver:
+                        updated.append(hint)
             elif hint.found and not self.receiver_hints[hint.id].found:
                 self.receiver_hints[hint.id] = hint
                 self.receiver_hints[hint.id].update = HintUpdate.found
-                updated.append(self.receiver_hints[hint.id])
+                if filters & HintFilters.receiver:
+                    updated.append(self.receiver_hints[hint.id])
             elif hint.classification != self.receiver_hints[hint.id].classification:
                 self.receiver_hints[hint.id] = hint
                 self.receiver_hints[hint.id].update = HintUpdate.classified
-                updated.append(self.receiver_hints[hint.id])
+                if filters & HintFilters.receiver:
+                    updated.append(self.receiver_hints[hint.id])
             if len(updated) == 10:
                 return updated
 
