@@ -3,6 +3,8 @@ import enum
 import json
 import logging
 from typing import Optional
+
+import aiohttp
 from shared.cursed_enum import CursedStrEnum
 from collections import defaultdict
 
@@ -227,9 +229,12 @@ class TrackedGame:
     def slot_id(self) -> int:
         return int(self.url.split("/")[-1])
 
-    def refresh(self) -> list[NetworkItem]:
+    async def refresh(self) -> list[NetworkItem]:
         logging.info(f"Refreshing {self.url}")
-        html = requests.get(self.url).content
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self.url) as response:
+                html = await response.text()
+        # html = requests.get(self.url).content
         soup = BeautifulSoup(html, features="html.parser")
         title = soup.find("title").string
         if title == "Page Not Found (404)":
@@ -239,7 +244,7 @@ class TrackedGame:
         if recieved is None:
             if '/tracker/' in self.url:
                 self.url = self.url.replace('/tracker/', '/generic_tracker/')
-                return self.refresh()
+                return await self.refresh()
         headers = [i.string for i in recieved.find_all("th")]
         rows = [[try_int(i.string) for i in r.find_all("td")] for r in recieved.find_all("tr")[1:]]
         if not rows:
@@ -370,7 +375,10 @@ class Multiworld:
         self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
 
         logging.info(f"Refreshing {self.url}")
-        data = requests.get(self.url).text
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self.url) as response:
+                data = await response.text()
+        # data = requests.get(self.url).text
         data = json.loads(data)
         self.tracker_id = data.get("tracker_id")
         self.title = data.get("title", self.title)

@@ -123,7 +123,7 @@ class APTracker(Extension):
 
         games = {}
         for tracker in self.trackers[ctx.author_id]:
-            new_items = tracker.refresh()
+            new_items = await tracker.refresh()
             if new_items:
                 games[tracker] = new_items
 
@@ -391,7 +391,7 @@ class APTracker(Extension):
         if tracker is None:
             return
         if not tracker.all_items:
-            tracker.refresh()
+            await tracker.refresh()
         await self.send_new_items(ctx, tracker, list(NetworkItem(i, tracker.game, tracker.all_items[i]) for i in tracker.all_items), ephemeral=True, inventory=True)
 
     @component_callback(regex_settings)
@@ -566,7 +566,7 @@ class APTracker(Extension):
                 multiworld, _found = await self.sync_cheese(player, tracker.tracker_id)
                 should_check = tracker.last_refresh is None or tracker.last_refresh.tzinfo is None or multiworld.last_activity() > tracker.last_refresh or datetime.datetime.now(tz=datetime.UTC) - tracker.last_checked > datetime.timedelta(hours=3)
                 if should_check:
-                    new_items = tracker.refresh()
+                    new_items = await tracker.refresh()
                 else:
                     new_items = []
 
