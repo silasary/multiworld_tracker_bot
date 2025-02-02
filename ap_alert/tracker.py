@@ -266,6 +266,8 @@ class APTracker(Extension):
 
         buttons: list[Button] = []
         for tracker in trackers:
+            if tracker.name is None:
+                tracker.name = tracker.tracker_id + " #" + tracker.slot_id
             name = tracker.name.replace("*", "")
             colour = ButtonStyle.BLUE
             if tracker.progression_status == ProgressionStatus.bk:
