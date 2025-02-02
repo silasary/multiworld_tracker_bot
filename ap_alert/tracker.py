@@ -59,6 +59,10 @@ class APTracker(Extension):
     @slash_option("url", "URL of the multiworld tracker", OptionType.STRING, required=True)
     async def ap_track(self, ctx: SlashContext, url: str) -> None:
         """Track an Archipelago game."""
+        if 'AAAAAAAAAAAAAA' in url:
+            await ctx.send("AAAAAAAAAAAAAA is an example room.  Please use the url for your async instead.", ephemeral=True)
+            return
+
         try:
             await ctx.author.fetch_dm()  # Make sure we can send DMs to this player
         except Forbidden:
