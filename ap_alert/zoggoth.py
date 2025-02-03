@@ -1,3 +1,8 @@
+"""
+Placeholder system for item classification.
+
+Temporary until https://github.com/ArchipelagoMW/Archipelago/pull/1052 gets merged.
+"""
 import logging
 import os
 import subprocess
@@ -54,7 +59,6 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
     to_replace = set()
 
     trailing_newline = True
-    fresh = True
 
     with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")) as f:
         for line in f:
@@ -77,7 +81,6 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
                 continue
             elif value in classifications:
                 dp.items[key] = classifications[value]
-                fresh = False
             else:
                 logging.error(f"Unknown classification `{value}` for item {key} in {name}.")
             trailing_newline = line.endswith("\n")
@@ -111,23 +114,14 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
                 written = True
 
     if written:
-        quoted_name = name.replace(" ", "_")
         to_append = to_append | to_replace
-        if len(to_append) >= 5:
-            fresh = False
-        if fresh:
-            subprocess.run(["git", "branch", "-f", quoted_name], cwd="zoggoth_repo")
-            subprocess.run(["git", "checkout", quoted_name], cwd="zoggoth_repo")
         subprocess.run(["git", "add", f"worlds/{name}/progression.txt"], cwd="zoggoth_repo")
         if len(to_append) < 4:
             message = f"{name}: Add {', '.join(to_append)}"
         else:
             message = f"{name}: Add {len(to_append)} items"
         subprocess.run(["git", "commit", "-m", message], cwd="zoggoth_repo")
-        if fresh:
-            subprocess.run(["git", "push", "--force", "-u", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
-        else:
-            subprocess.run(["git", "push", "-u", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
+        subprocess.run(["git", "push", "-u", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
         subprocess.run(["git", "checkout", "main"], cwd="zoggoth_repo")
 
 clone_repo()
