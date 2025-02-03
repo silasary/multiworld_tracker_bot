@@ -182,6 +182,8 @@ class CheeseGame(dict):
     @property
     def last_checked(self) -> datetime.datetime:
         last_checked_string = self.get("last_checked", None)
+        if isinstance(last_checked_string, datetime.datetime):
+            return last_checked_string
         return datetime.datetime.fromisoformat(last_checked_string or "1970-01-01T00:00:00Z")
 
     @property
