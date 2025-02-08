@@ -576,9 +576,13 @@ class APTracker(Extension):
                 multiworld.title = room
         return room, multiworld
 
-    def remove_tracker(self, player, url):
+    def remove_tracker(self, player, tracker: str | TrackedGame) -> None:
+
         for t in self.trackers[player.id].copy():
-            if t.url == url:
+            if isinstance(tracker, str) and  t.url == tracker:
+                self.trackers[player.id].remove(t)
+                return
+            elif isinstance(tracker, TrackedGame) and t == tracker:
                 self.trackers[player.id].remove(t)
                 return
 
@@ -607,12 +611,18 @@ class APTracker(Extension):
             urls = set()
             ids = set()
             for tracker in trackers:
+                if tracker.failures >= 10:
+                    self.remove_tracker(player, tracker)
+                    await player.send(f"Tracker {tracker.url} has been removed due to errors")
+                    self.save()
+                    continue
+
                 if tracker.url in urls:
-                    self.remove_tracker(player, tracker.url)
+                    self.remove_tracker(player, tracker)
                     self.save()
                     continue
                 if tracker.id in ids:
-                    self.remove_tracker(player, tracker.url)
+                    self.remove_tracker(player, tracker)
                     self.save()
                     continue
                 urls.add(tracker.url)
