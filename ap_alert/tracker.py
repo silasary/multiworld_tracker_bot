@@ -105,7 +105,10 @@ class APTracker(Extension):
             await self.ap_refresh(ctx)
         else:
             # Track cheese room
-            _mw, found = await self.sync_cheese(ctx.author, url)
+            mw, found = await self.sync_cheese(ctx.author, url)
+            if not mw:
+                await ctx.send("Room not found", ephemeral=True)
+                return
             if not found:
                 await ctx.send("This is a multiworld tracker, please click provide the slot tracker URL by clicking the number next to your slot", ephemeral=True)
                 return
@@ -478,6 +481,9 @@ class APTracker(Extension):
 
     async def sync_cheese(self, player: User, room: str) -> tuple[Multiworld, bool]:
         room, multiworld = await self.url_to_multiworld(room)
+        if multiworld is None:
+            return None, False
+
         found_tracker = False
 
         await multiworld.refresh()
@@ -554,11 +560,14 @@ class APTracker(Extension):
         multiworld = self.cheese.get(room)
         if multiworld is None:
             ap_url = f"https://archipelago.gg/tracker/{room}"
-            ch_id = (
-                requests.post(
+            response = requests.post(
                     "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
                     json={"url": ap_url},
                 )
+            if response.status_code in [400, 403]:
+                return room, None
+            ch_id = (
+                response
                 .json()
                 .get("tracker_id")
             )
@@ -603,6 +612,13 @@ class APTracker(Extension):
                     continue
                 urls.add(tracker.url)
                 multiworld, _found = await self.sync_cheese(player, tracker.tracker_id)
+                if multiworld is None:
+                    tracker.failures += 1
+                    if tracker.failures >= 3:
+                        self.remove_tracker(player, tracker.url)
+                        await player.send(f"Tracker {tracker.url} has been removed due to errors")
+                    self.save()
+                    continue
                 should_check = tracker.last_refresh is None or tracker.last_refresh.tzinfo is None or multiworld.last_activity() > tracker.last_refresh or datetime.datetime.now(tz=datetime.UTC) - tracker.last_checked > datetime.timedelta(hours=3)
                 if should_check:
                     new_items = await tracker.refresh()
