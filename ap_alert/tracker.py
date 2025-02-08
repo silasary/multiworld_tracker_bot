@@ -357,7 +357,7 @@ class APTracker(Extension):
             components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji="🗑️", custom_id=f"remove:{tracker.id}"))
 
 
-        return await ctx.send(embed=embed, components=components, ephemeral=True)
+        return await ctx.send(embed=embed, components=spread_to_rows(components), ephemeral=True)
 
     @component_callback(regex_remove)
     async def remove(self, ctx: ComponentContext) -> None:
