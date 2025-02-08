@@ -284,6 +284,7 @@ class TrackedGame:
                 return await self.refresh()
         headers = [i.string for i in recieved.find_all("th")]
         rows = [[try_int(i.string) for i in r.find_all("td")] for r in recieved.find_all("tr")[1:]]
+        self.last_refresh = datetime.datetime.now(tz=datetime.timezone.utc)
         if not rows:
             return []
 
@@ -291,7 +292,6 @@ class TrackedGame:
         index_amount = headers.index("Amount")
         index_item = headers.index("Item")
 
-        self.last_refresh = datetime.datetime.now(tz=datetime.timezone.utc)
         rows.sort(key=lambda r: r[index_order])
         if rows[-1][index_order] < self.latest_item:
             self.latest_item = -1
