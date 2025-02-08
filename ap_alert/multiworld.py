@@ -5,6 +5,7 @@ import logging
 from typing import Optional
 
 import aiohttp
+import interactions
 from shared.cursed_enum import CursedStrEnum
 from collections import defaultdict
 
@@ -190,6 +191,37 @@ class CheeseGame(dict):
     def name(self) -> str:
         return self.get("name", self.get("position", "Unknown"))
 
+
+@attrs.define()
+class Player:
+    id: int
+    name: str = None
+
+    cheese_api_key: str | None = None
+
+    @property
+    def mention(self) -> str:
+        return f"<@{self.id}>"
+
+    def __str__(self) -> str:
+        return f"{self.name}#{self.discriminator}"
+
+    async def get_trackers(self) -> list["Multiworld"]:
+        async with aiohttp.ClientSession() as session:
+            headers = {"Authorization": f"Bearer {self.cheese_api_key}"} if self.cheese_api_key else {}
+            async with session.get("https://cheesetrackers.theincrediblewheelofchee.se/api/dashboard/tracker", headers=headers) as response:
+                data = await response.json()
+        value = []
+        for tracker in data:
+            url = f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{tracker['tracker_id']}"
+            if MULTIWORLDS.get(tracker['tracker_id']) is not None:
+                value.append(MULTIWORLDS[tracker['tracker_id']])
+            else:
+                value.append(Multiworld(url))
+        return value
+
+    def update(self, user: interactions.User) -> None:
+        self.name = user.global_name
 
 @attrs.define()
 class TrackedGame:
@@ -386,6 +418,7 @@ class Multiworld:
         self.title = data.get("title", self.title)
         self.games = {g["position"]: CheeseGame(g) for g in data.get("games")}
         GAMES.update({g.id: g for g in self.games.values()})
+        MULTIWORLDS[self.tracker_id] = self
         self.last_update = datetime.datetime.fromisoformat(data.get("updated_at"))
         self.upstream_url = data.get("upstream_url")
         self.room_link	 = data.get("room_link")
@@ -412,3 +445,4 @@ def try_int(text: str) -> str | int:
 
 DATAPACKAGES: dict[str, "Datapackage"] = defaultdict(Datapackage)
 GAMES: dict[int, CheeseGame] = {}
+MULTIWORLDS: dict[str, Multiworld] = {}

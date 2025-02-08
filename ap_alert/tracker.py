@@ -19,7 +19,7 @@ from interactions.models.internal.tasks import IntervalTrigger, Task
 from ap_alert.converter import converter
 
 from . import zoggoth
-from .multiworld import (GAMES, Datapackage, Filters, HintFilters, ItemClassification, Multiworld, NetworkItem, OldDatapackage, ProgressionStatus, TrackedGame, CompletionStatus)
+from .multiworld import (GAMES, Datapackage, Filters, HintFilters, ItemClassification, Multiworld, NetworkItem, OldDatapackage, Player, ProgressionStatus, TrackedGame, CompletionStatus)
 
 
 regex_dash = re.compile(r"dash:(\d+)")
@@ -37,7 +37,9 @@ class APTracker(Extension):
         self.trackers: dict[int, list[TrackedGame]] = {}
         self.cheese: dict[str, Multiworld] = {}
         self.datapackages: dict[str, Datapackage] = {}
+        self.players: dict[int, Player] = {}
         self.tracker_count = 0
+        self.user_count = 0
         self.load()
         zoggoth.update_all(self.datapackages)
 
@@ -141,6 +143,18 @@ class APTracker(Extension):
 
         for tracker, items in games.items():
             await self.try_classify(ctx, tracker, items, ephemeral)
+        self.save()
+
+    @ap.subcommand("authenticate")
+    @slash_option("api_key", "Your Cheese Tracker API key", OptionType.STRING, required=True)
+    async def ap_authenticate(self, ctx: SlashContext, api_key: str) -> None:
+        """Authenticate with Cheese Tracker. This allows the bot to automatically track your claimed games."""
+        player = self.players.get(ctx.author_id)
+        if player is None:
+            player = Player(ctx.author_id)
+            self.players[ctx.author_id] = player
+        player.cheese_api_key = api_key
+        await ctx.send("API key saved", ephemeral=True)
         self.save()
 
     async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[NetworkItem], ephemeral: bool = False) -> None:
@@ -522,6 +536,11 @@ class APTracker(Extension):
         return multiworld, found_tracker
 
     async def url_to_multiworld(self, room):
+        if isinstance(room, Multiworld):
+            multiworld = room
+            room = multiworld.upstream_url
+            return room, multiworld
+
         if 'cheesetrackers' in room:
             ch_id = room.split('/')[-1]
             multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
@@ -562,6 +581,18 @@ class APTracker(Extension):
             player = await self.bot.fetch_user(user)
             if not player:
                 continue
+
+            player_settings = self.players.get(player.id)
+            if player_settings is None:
+                player_settings = Player(player.id)
+                self.players[player.id] = player_settings
+            player_settings.update(player)
+
+            if player_settings.cheese_api_key:
+                cheese_dash = await player_settings.get_trackers()
+                for multiworld in cheese_dash:
+                    await self.sync_cheese(player, multiworld)
+
             urls = set()
             for tracker in trackers:
                 if tracker.url in urls:
@@ -614,6 +645,7 @@ class APTracker(Extension):
                         await asyncio.sleep(3) # three doesn't go into 3600 evenly, so overflows will be spread out
                     else:
                         await asyncio.sleep(5)
+
             if trackers:
                 user_count += 1
             if progress > 10:
@@ -662,6 +694,9 @@ class APTracker(Extension):
         dp = json.dumps(converter.unstructure(self.datapackages), indent=2)
         with open("gamedata.json", "w") as f:
             f.write(dp)
+        players = json.dumps(converter.unstructure(self.players), indent=2)
+        with open("players.json", "w") as f:
+            f.write(players)
         with open("stats.json", "w") as f:
             f.write(json.dumps({"tracker_count": self.tracker_count, "user_count": self.user_count}, indent=2))
 
@@ -684,15 +719,15 @@ class APTracker(Extension):
             sentry_sdk.capture_exception(e)
             print(e)
         try:
+            if os.path.exists("players.json"):
+                with open("players.json") as f:
+                    self.players = converter.structure(json.loads(f.read()), dict[int, Player])
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            print(e)
+        try:
             if os.path.exists("datapackages.json"):
-                with open("datapackages.json") as f:
-                    olds = converter.structure(json.loads(f.read()), dict[str, OldDatapackage])
-                    for name, old in olds.items():
-                        if name not in self.datapackages:
-                            self.datapackages[name] = Datapackage(items={})
-                        for k, v in old.items.items():
-                            self.datapackages[name].items[k] = ItemClassification[v.name]
-
+                os.unlink("datapackages.json")
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
