@@ -218,8 +218,8 @@ class APTracker(Extension):
         async def icon(item: NetworkItem) -> str:
             emoji = "❓"
 
-            if tracker.game in self.datapackages and item.name in self.datapackages[tracker.game].items:
-                classification = self.datapackages[tracker.game].items[item.name]
+            if tracker.game in self.datapackages:
+                classification = self.datapackages[tracker.game].items.get(item.name, ItemClassification.unknown)
                 if inventory and classification == ItemClassification.unknown:
                     await self.try_classify(ctx_or_user, tracker, new_items)
                     classification = self.datapackages[tracker.game].items[item.name]
