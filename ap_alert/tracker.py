@@ -605,12 +605,19 @@ class APTracker(Extension):
                     await self.sync_cheese(player, multiworld)
 
             urls = set()
+            ids = set()
             for tracker in trackers:
                 if tracker.url in urls:
                     self.remove_tracker(player, tracker.url)
                     self.save()
                     continue
+                if tracker.id in ids:
+                    self.remove_tracker(player, tracker.url)
+                    self.save()
+                    continue
                 urls.add(tracker.url)
+                if tracker.id:
+                    ids.add(tracker.id)
                 multiworld, _found = await self.sync_cheese(player, tracker.tracker_id)
                 if multiworld is None:
                     tracker.failures += 1
