@@ -69,10 +69,6 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
             key = ": ".join(splits[:-1])
             value = splits[-1].strip().lower()
 
-            bad_key = ": ".join(splits[:-1])  # oops
-            if bad_key in dp.items:
-                dp.items.pop(bad_key)
-
             to_append.discard(key)
             if value == "unknown":
                 # logging.info(f"Zoggoth doesn't know the classification for item {key} in {name}.")
