@@ -131,10 +131,14 @@ class APTracker(Extension):
         ephemeral = await defer_ephemeral_if_guild(ctx)
 
         games = {}
-        for tracker in self.trackers[ctx.author_id]:
+        for tracker in self.trackers[ctx.author_id].copy():
             new_items = await tracker.refresh()
             if new_items:
                 games[tracker] = new_items
+            if tracker.failures >= 3:
+                self.remove_tracker(ctx.author, tracker)
+                await ctx.send(f"Tracker {tracker.url} has been removed due to errors", ephemeral=ephemeral)
+                self.save()
 
         if not games:
             await ctx.send("No new items", ephemeral=True)
@@ -360,7 +364,7 @@ class APTracker(Extension):
             components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji="🗑️", custom_id=f"remove:{tracker.id}"))
 
 
-        return await ctx.send(embed=embed, components=spread_to_rows(components), ephemeral=True)
+        return await ctx.send(embed=embed, components=spread_to_rows(*components), ephemeral=True)
 
     @component_callback(regex_remove)
     async def remove(self, ctx: ComponentContext) -> None:
