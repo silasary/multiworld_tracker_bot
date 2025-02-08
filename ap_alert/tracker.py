@@ -538,7 +538,9 @@ class APTracker(Extension):
     async def url_to_multiworld(self, room):
         if isinstance(room, Multiworld):
             multiworld = room
-            room = multiworld.upstream_url
+            if multiworld.upstream_url is None:
+                await multiworld.refresh()
+            room = multiworld.upstream_url.split('/')[-1]
             return room, multiworld
 
         if 'cheesetrackers' in room:
