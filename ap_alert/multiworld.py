@@ -267,6 +267,9 @@ class TrackedGame:
         logging.info(f"Refreshing {self.url}")
         async with aiohttp.ClientSession() as session:
             async with session.get(self.url) as response:
+                if response.status != 200:
+                    self.failures += 1
+                    return []
                 html = await response.text()
         # html = requests.get(self.url).content
         soup = BeautifulSoup(html, features="html.parser")
