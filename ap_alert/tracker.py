@@ -200,6 +200,8 @@ class APTracker(Extension):
                     classification = ItemClassification.mcguffin
                 else:
                     print(f"wat: {chosen.ctx.custom_id}")
+                if tracker.game not in self.datapackages:
+                    self.datapackages[tracker.game] = Datapackage(items={})
                 self.datapackages[tracker.game].items[item] = classification
                 await chosen.ctx.send(f"✅{item} is {classification}", ephemeral=True)
             except TimeoutError:
