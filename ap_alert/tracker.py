@@ -162,7 +162,13 @@ class APTracker(Extension):
             self.players[ctx.author_id] = player
         player.cheese_api_key = api_key
         await ctx.send("API key saved", ephemeral=True)
+        if player.id not in self.trackers:
+            self.trackers[player.id] = []
         self.save()
+        cheese_dash = await player.get_trackers()
+        for multiworld in cheese_dash:
+            await self.sync_cheese(player, multiworld)
+
 
     async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[NetworkItem], ephemeral: bool = False) -> None:
         if tracker.game is None:
@@ -497,7 +503,6 @@ class APTracker(Extension):
 
         for game in multiworld.games.values():
             game["url"] = f'https://archipelago.gg/tracker/{room}/0/{game["position"]}'
-            is_game_done = game["checks_done"] == game["checks_total"] and game.completion_status in [CompletionStatus.done, CompletionStatus.released]
 
             for t in self.trackers.get(player.id, []):
                 if t.url == game["url"]:
@@ -515,6 +520,8 @@ class APTracker(Extension):
                     self.trackers[player.id] = []
 
                 if tracker is None:
+                    is_game_done = game["checks_done"] == game["checks_total"] or game.completion_status in [CompletionStatus.done, CompletionStatus.released]
+                    # If either condition is true, we don't want to autotrack track this game.
                     if is_game_done or age > datetime.timedelta(days=1) or is_mw_abandoned:
                         continue
 
@@ -531,7 +538,8 @@ class APTracker(Extension):
                     tracker.name = f"{room} - **{game['name']}**"
                 tracker.update(game)
 
-                if is_game_done:
+                if game["checks_done"] == game["checks_total"] and game.completion_status in [CompletionStatus.done, CompletionStatus.released]:
+                    # Removing needs an and, because 100% no goal can happen.
                     self.remove_tracker(player, tracker.url)
                     await player.send(f"Game {tracker.name} is complete")
                     continue
@@ -761,6 +769,9 @@ class APTracker(Extension):
             if os.path.exists("players.json"):
                 with open("players.json") as f:
                     self.players = converter.structure(json.loads(f.read()), dict[int, Player])
+                for player in self.players.values():
+                    if player.cheese_api_key:
+                        self.trackers.setdefault(player.id, [])
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
