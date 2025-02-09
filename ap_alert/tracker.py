@@ -18,7 +18,7 @@ from interactions.models.internal.tasks import IntervalTrigger, Task
 
 from ap_alert.converter import converter
 
-from . import zoggoth
+from . import external_data
 from .multiworld import (GAMES, Datapackage, Filters, HintFilters, ItemClassification, Multiworld, NetworkItem, OldDatapackage, Player, ProgressionStatus, TrackedGame, CompletionStatus)
 
 
@@ -41,13 +41,13 @@ class APTracker(Extension):
         self.tracker_count = 0
         self.user_count = 0
         self.load()
-        zoggoth.update_all(self.datapackages)
+        external_data.update_all(self.datapackages)
 
     @listen()
     async def on_startup(self) -> None:
         self.refresh_all.start()
         self.refresh_all.trigger.last_call_time = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=1)
-        zoggoth.update_datapackage.start()
+        external_data.update_datapackage.start()
         # await zoggoth.update_datapackage()
         activity = Activity(name=f"{self.tracker_count} slots across {self.user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
@@ -120,7 +120,7 @@ class APTracker(Extension):
 
         if tracker.game not in self.datapackages:
             self.datapackages[tracker.game] = Datapackage(items={})
-            zoggoth.load_datapackage(tracker.game, self.datapackages[tracker.game])
+            external_data.load_datapackage(tracker.game, self.datapackages[tracker.game])
 
     @ap.subcommand("refresh")
     async def ap_refresh(self, ctx: SlashContext) -> None:
@@ -732,7 +732,7 @@ class APTracker(Extension):
     def get_classification(self, game, item):
         if game not in self.datapackages:
             self.datapackages[game] = Datapackage(items={})
-            zoggoth.load_datapackage(game, self.datapackages[game])
+            external_data.load_datapackage(game, self.datapackages[game])
         if item not in self.datapackages[game].items:
             self.datapackages[game].items[item] = ItemClassification.unknown
         return self.datapackages[game].items[item]
