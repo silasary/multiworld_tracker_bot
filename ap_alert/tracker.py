@@ -567,16 +567,20 @@ class APTracker(Extension):
             await multiworld.refresh()
             room = multiworld.upstream_url
 
+        ap_url = None
         if '/tracker/' in room or '/generic_tracker/' in room:
+            ap_url = room
             room = room.split('/')[-1]
+
         multiworld = self.cheese.get(room)
         if multiworld is None:
-            ap_url = f"https://archipelago.gg/tracker/{room}"
+            if ap_url is None:
+                ap_url = f"https://archipelago.gg/tracker/{room}"
             response = requests.post(
                     "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
                     json={"url": ap_url},
                 )
-            if response.status_code in [400, 403]:
+            if response.status_code in [400, 403, 404]:
                 return room, None
             ch_id = (
                 response
