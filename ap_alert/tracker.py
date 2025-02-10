@@ -95,6 +95,9 @@ class APTracker(Extension):
                 self.save()
 
             room, multiworld = await self.url_to_multiworld('/'.join(url.split("/")[:-2]))
+            if multiworld is None:
+                await ctx.send(f"An error has occurred.  Could not set up `{room}` with {url}", ephemeral=True)
+                return
             await ctx.send(f"Setting up tracker for https://archipelago.gg/tracker/{room}...", ephemeral=ephemeral)
             await multiworld.refresh()
             slot = multiworld.games[int(url.split("/")[-1])]
@@ -167,7 +170,7 @@ class APTracker(Extension):
         self.save()
         cheese_dash = await player.get_trackers()
         for multiworld in cheese_dash:
-            await self.sync_cheese(player, multiworld)
+            await self.sync_cheese(ctx.author, multiworld)
 
 
     async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[NetworkItem], ephemeral: bool = False) -> None:
@@ -300,7 +303,7 @@ class APTracker(Extension):
         buttons: list[Button] = []
         for tracker in trackers:
             if tracker.name is None:
-                tracker.name = tracker.tracker_id + " #" + tracker.slot_id
+                tracker.name = f'{tracker.tracker_id} #{tracker.slot_id}'
             name = tracker.name.replace("*", "")
             colour = ButtonStyle.BLUE
             if tracker.progression_status == ProgressionStatus.bk:

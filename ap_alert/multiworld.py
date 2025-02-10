@@ -243,12 +243,12 @@ class TrackedGame:
     last_checked: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
     last_activity: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
 
-    all_items: dict[str, int] = attrs.field(factory=dict, init=False)
+    all_items: dict[str, int] = attrs.field(factory=dict, init=False, repr=False)
     new_items: list[NetworkItem] = attrs.field(factory=list, init=False)
 
     # hints: list[Hint] = attrs.field(factory=list)
-    finder_hints: dict[int, Hint] = attrs.field(factory=dict)
-    receiver_hints: dict[int, Hint] = attrs.field(factory=dict)
+    finder_hints: dict[int, Hint] = attrs.field(factory=dict, repr=False)
+    receiver_hints: dict[int, Hint] = attrs.field(factory=dict, repr=False)
 
 
     def __hash__(self) -> int:
