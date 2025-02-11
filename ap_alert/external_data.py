@@ -13,6 +13,7 @@ from .multiworld import Datapackage, ItemClassification, DATAPACKAGES
 
 classifications = {v.name: v for v in ItemClassification}
 
+
 @Task.create(IntervalTrigger(days=1))
 async def update_datapackage() -> None:
     """Update the datapackage."""
@@ -31,10 +32,12 @@ def clone_repo() -> None:
         subprocess.run(["git", "remote", "add", "silasary", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
         subprocess.run(["git", "pull", "silasary", "main"], cwd="zoggoth_repo")
 
+
 def update_all(dps: dict[str, Datapackage]) -> None:
     """Update all datapackages."""
     for name, dp in dps.items():
         load_datapackage(name, dp)
+
 
 def load_datapackage(name: str, dp: Datapackage) -> None:
     logging.info(f"Loading datapackage {name}")
@@ -45,7 +48,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
     if not os.path.exists("zoggoth_repo"):
         clone_repo()
     if not os.path.exists(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")):
-        if name in ['None', 'null']:
+        if name in ["None", "null"]:
             return
 
         logging.info(f"Datapackage {name} not found in Zoggoth's repo.")
@@ -53,8 +56,8 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
         with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "w") as f:
             f.write("")
 
-    all_keys = set(dp.items.keys())
-    to_append = set(k for k,v in dp.items.items() if v not in [ItemClassification.unknown, ItemClassification.bad_name])
+    set(dp.items.keys())
+    to_append = set(k for k, v in dp.items.items() if v not in [ItemClassification.unknown, ItemClassification.bad_name])
     to_append.discard("Rollback detected!")
     to_replace = set()
 
@@ -119,5 +122,6 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
         subprocess.run(["git", "commit", "-m", message], cwd="zoggoth_repo")
         subprocess.run(["git", "push", "-u", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
         subprocess.run(["git", "checkout", "main"], cwd="zoggoth_repo")
+
 
 clone_repo()

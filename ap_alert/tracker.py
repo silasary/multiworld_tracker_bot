@@ -12,14 +12,13 @@ from interactions import Activity, ActivityType, Client, ComponentContext, Exten
 from interactions.client.errors import Forbidden, NotFound
 from interactions.ext.paginators import Paginator
 from interactions.models.discord import Button, ButtonStyle, User, Embed, Message
-from interactions.models.internal.application_commands import (
-    OptionType, integration_types, slash_command, slash_option)
+from interactions.models.internal.application_commands import OptionType, integration_types, slash_command, slash_option
 from interactions.models.internal.tasks import IntervalTrigger, Task
 
 from ap_alert.converter import converter
 
 from . import external_data
-from .multiworld import (GAMES, Datapackage, Filters, HintFilters, ItemClassification, Multiworld, NetworkItem, OldDatapackage, Player, ProgressionStatus, TrackedGame, CompletionStatus)
+from .multiworld import GAMES, Datapackage, Filters, HintFilters, ItemClassification, Multiworld, NetworkItem, Player, ProgressionStatus, TrackedGame, CompletionStatus
 
 
 regex_dash = re.compile(r"dash:(\d+)")
@@ -30,6 +29,7 @@ regex_inv = re.compile(r"inv:(\d+)")
 regex_settings = re.compile(r"settings:(\d+)")
 regex_filter = re.compile(r"filter:(\d+):(\d+)")
 regex_hint_filter = re.compile(r"hint_filter:(\d+):(\d+)")
+
 
 class APTracker(Extension):
     def __init__(self, bot: Client) -> None:
@@ -61,7 +61,7 @@ class APTracker(Extension):
     @slash_option("url", "URL of the multiworld tracker", OptionType.STRING, required=True)
     async def ap_track(self, ctx: SlashContext, url: str) -> None:
         """Track an Archipelago game."""
-        if 'AAAAAAAAAAAAAA' in url:
+        if "AAAAAAAAAAAAAA" in url:
             await ctx.send("AAAAAAAAAAAAAA is an example room.  Please use the url for your async instead.", ephemeral=True)
             return
 
@@ -71,10 +71,10 @@ class APTracker(Extension):
             await ctx.send("I can't send you DMs, please enable them so I can notify you when you get new items.", ephemeral=True)
             return
 
-        if '/room/' in url:
+        if "/room/" in url:
             await ctx.send("Please use the tracker URL, not the room URL", ephemeral=True)
             return
-        if re.match(r'^archipelago.gg:\d+$', url):
+        if re.match(r"^archipelago.gg:\d+$", url):
             await ctx.send("Please use the tracker URL, not the port number", ephemeral=True)
             return
 
@@ -94,7 +94,7 @@ class APTracker(Extension):
                 self.trackers[ctx.author_id].append(tracker)
                 self.save()
 
-            room, multiworld = await self.url_to_multiworld('/'.join(url.split("/")[:-2]))
+            room, multiworld = await self.url_to_multiworld("/".join(url.split("/")[:-2]))
             if multiworld is None:
                 await ctx.send(f"An error has occurred.  Could not set up `{room}` with {url}", ephemeral=True)
                 return
@@ -172,7 +172,6 @@ class APTracker(Extension):
         for multiworld in cheese_dash:
             await self.sync_cheese(ctx.author, multiworld)
 
-
     async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[NetworkItem], ephemeral: bool = False) -> None:
         if tracker.game is None:
             return
@@ -235,7 +234,7 @@ class APTracker(Extension):
                     await self.try_classify(ctx_or_user, tracker, new_items)
                     classification = self.datapackages[tracker.game].items[item.name]
                 if classification == ItemClassification.mcguffin:
-                    emoji =  "✨"
+                    emoji = "✨"
                 if classification == ItemClassification.filler:
                     emoji = f"<:{'f' if len(new_items) > 10 else 'filler'}:1277502385459171338>"
                 if classification == ItemClassification.useful:
@@ -246,8 +245,8 @@ class APTracker(Extension):
                     emoji = "❌"
 
             if inventory:
-                return f'{emoji} {item.name} x{item.quantity}'
-            return f'{emoji} {item.name}'
+                return f"{emoji} {item.name} x{item.quantity}"
+            return f"{emoji} {item.name}"
 
         names = [await icon(i) for i in new_items]
         slot_name = tracker.name or tracker.url
@@ -255,7 +254,7 @@ class APTracker(Extension):
         if len(names) == 1:
             components = []
             if tracker.filters == Filters.unset:
-                components.append(Button(style=ButtonStyle.GREY, label="Configure Filters",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
+                components.append(Button(style=ButtonStyle.GREY, label="Configure Filters", emoji="⚙️", custom_id=f"settings:{tracker.id}"))
             await ctx_or_user.send(f"{slot_name}: {names[0]}", ephemeral=ephemeral, components=components)
         elif len(names) > 10:
             text = f"{slot_name}:\n"
@@ -265,7 +264,7 @@ class APTracker(Extension):
                 ItemClassification.unknown: [],
                 ItemClassification.useful: [],
                 ItemClassification.filler: [],
-                ItemClassification.trap: []
+                ItemClassification.trap: [],
             }
 
             for item in new_items:
@@ -303,7 +302,7 @@ class APTracker(Extension):
         buttons: list[Button] = []
         for tracker in trackers:
             if tracker.name is None:
-                tracker.name = f'{tracker.tracker_id} #{tracker.slot_id}'
+                tracker.name = f"{tracker.tracker_id} #{tracker.slot_id}"
             name = tracker.name.replace("*", "")
             colour = ButtonStyle.BLUE
             if tracker.progression_status == ProgressionStatus.bk:
@@ -331,7 +330,7 @@ class APTracker(Extension):
 
         name = tracker.name
         if multiworld:
-            port = f' ({multiworld.last_port})' if multiworld.last_port else ''
+            port = f" ({multiworld.last_port})" if multiworld.last_port else ""
             if not name.endswith(port):
                 name = name + port
 
@@ -344,11 +343,11 @@ class APTracker(Extension):
         embed.add_field("Last Progression Item", tracker.last_progression[0] + " " + prog_time)
         check_time = max(tracker.last_checked, tracker.last_activity)
         last_checked = format_relative_time(check_time)
-        embed.add_field("Progression Status", f'{tracker.progression_status.name} (Last Checked: {last_checked})')
+        embed.add_field("Progression Status", f"{tracker.progression_status.name} (Last Checked: {last_checked})")
         components = []
 
         components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji="💼", custom_id=f"inv:{tracker.id}"))
-        components.append(Button(style=ButtonStyle.GREY, label="Settings",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
+        components.append(Button(style=ButtonStyle.GREY, label="Settings", emoji="⚙️", custom_id=f"settings:{tracker.id}"))
         if multiworld and multiworld.room_link:
             components.append(Button(style=ButtonStyle.URL, label="Open Room", url=multiworld.room_link))
 
@@ -373,7 +372,6 @@ class APTracker(Extension):
 
         if not is_owner or only_game:
             components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji="🗑️", custom_id=f"remove:{tracker.id}"))
-
 
         return await ctx.send(embed=embed, components=spread_to_rows(*components), ephemeral=True)
 
@@ -416,7 +414,7 @@ class APTracker(Extension):
         await multiworld.refresh(force=True)
         game = multiworld.games[tracker.slot_id]
         # game["progression_status"] = ProgressionStatus.bk
-        game['last_checked'] = datetime.datetime.now(tz=datetime.timezone.utc)
+        game["last_checked"] = datetime.datetime.now(tz=datetime.timezone.utc)
         multiworld.put(game)
 
         await ctx.send("Progression status updated", ephemeral=True)
@@ -442,23 +440,26 @@ class APTracker(Extension):
         multiworld = self.cheese[tracker.tracker_id]
 
         name = tracker.name
-        port = f' ({multiworld.last_port})' if multiworld.last_port else ''
+        port = f" ({multiworld.last_port})" if multiworld.last_port else ""
         if not name.endswith(port):
             name = name + port
 
         embed = Embed(title=name)
         embed.add_field("Current Notification Filter", tracker.filters.name)
         components = []
+
         def filter_button(name: str, value: Filters):
             colour = ButtonStyle.GREY
             if value == tracker.filters:
                 colour = ButtonStyle.GREEN
             return Button(style=colour, label=name, custom_id=f"filter:{tracker.id}:{value.value}")
+
         def hint_filter_button(name: str, value: Filters):
             colour = ButtonStyle.GREY
             if value == tracker.hint_filters:
                 colour = ButtonStyle.GREEN
             return Button(style=colour, label=name, custom_id=f"hint_filter:{tracker.id}:{value.value}")
+
         components.append(filter_button("Filter: Nothing", Filters.none))
         components.append(filter_button("Filter: Everything", Filters.everything))
         components.append(filter_button("Filter: Useful+", Filters.useful_plus))
@@ -513,12 +514,11 @@ class APTracker(Extension):
                 if t.url == game["url"]:
                     tracker = t
                     break
-                elif t.url == game["url"].replace('/tracker/', '/generic_tracker/'):
+                elif t.url == game["url"].replace("/tracker/", "/generic_tracker/"):
                     tracker = t
                     break
             else:
                 tracker = None
-
 
             if game.get("effective_discord_username") == player.username:
                 if player.id not in self.trackers:
@@ -563,44 +563,39 @@ class APTracker(Extension):
             multiworld = room
             if multiworld.upstream_url is None:
                 await multiworld.refresh()
-            room = multiworld.upstream_url.split('/')[-1]
+            room = multiworld.upstream_url.split("/")[-1]
             return room, multiworld
 
-        if 'cheesetrackers' in room:
-            ch_id = room.split('/')[-1]
+        if "cheesetrackers" in room:
+            ch_id = room.split("/")[-1]
             multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
             await multiworld.refresh()
             room = multiworld.upstream_url
 
         ap_url = None
-        if '/tracker/' in room or '/generic_tracker/' in room:
+        if "/tracker/" in room or "/generic_tracker/" in room:
             ap_url = room
-            room = room.split('/')[-1]
+            room = room.split("/")[-1]
 
         multiworld = self.cheese.get(room)
         if multiworld is None:
             if ap_url is None:
                 ap_url = f"https://archipelago.gg/tracker/{room}"
             response = requests.post(
-                    "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
-                    json={"url": ap_url},
-                )
+                "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
+                json={"url": ap_url},
+            )
             if response.status_code in [400, 403, 404]:
                 return room, None
-            ch_id = (
-                response
-                .json()
-                .get("tracker_id")
-            )
+            ch_id = response.json().get("tracker_id")
             multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
             if not multiworld.title:
                 multiworld.title = room
         return room, multiworld
 
     def remove_tracker(self, player, tracker: str | TrackedGame) -> None:
-
         for t in self.trackers[player.id].copy():
-            if isinstance(tracker, str) and  t.url == tracker:
+            if isinstance(tracker, str) and t.url == tracker:
                 self.trackers[player.id].remove(t)
                 return
             elif isinstance(tracker, TrackedGame) and t == tracker:
@@ -628,7 +623,7 @@ class APTracker(Extension):
                 if player_settings.cheese_api_key:
                     try:
                         cheese_dash = await player_settings.get_trackers()
-                    except Forbidden as e:
+                    except Forbidden:
                         player_settings.cheese_api_key = None
                         self.save()
                         await player.send("Failed to authenticate with Cheese Tracker.  Please reauthenticate with `/ap authenticate`")
@@ -664,7 +659,12 @@ class APTracker(Extension):
                             await player.send(f"Tracker {tracker.url} has been removed due to errors")
                         self.save()
                         continue
-                    should_check = tracker.last_refresh is None or tracker.last_refresh.tzinfo is None or multiworld.last_activity() > tracker.last_refresh or datetime.datetime.now(tz=datetime.UTC) - tracker.last_checked > datetime.timedelta(hours=3)
+                    should_check = (
+                        tracker.last_refresh is None
+                        or tracker.last_refresh.tzinfo is None
+                        or multiworld.last_activity() > tracker.last_refresh
+                        or datetime.datetime.now(tz=datetime.UTC) - tracker.last_checked > datetime.timedelta(hours=3)
+                    )
                     if should_check:
                         new_items = await tracker.refresh()
                     else:
@@ -693,7 +693,7 @@ class APTracker(Extension):
                         if hints:
                             components = []
                             if tracker.hint_filters == HintFilters.unset:
-                                components.append(Button(style=ButtonStyle.GREY, label="Configure Hint Filters",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
+                                components.append(Button(style=ButtonStyle.GREY, label="Configure Hint Filters", emoji="⚙️", custom_id=f"settings:{tracker.id}"))
                             await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints], components=components)
                     except Forbidden:
                         logging.error(f"Failed to send message to {player.global_name} ({player.id})")
@@ -705,7 +705,7 @@ class APTracker(Extension):
                     if should_check:
                         # if we didn't check anything, we don't need to wait
                         if self.tracker_count > 720:
-                            await asyncio.sleep(3) # three doesn't go into 3600 evenly, so overflows will be spread out
+                            await asyncio.sleep(3)  # three doesn't go into 3600 evenly, so overflows will be spread out
                         else:
                             await asyncio.sleep(5)
 
@@ -718,7 +718,6 @@ class APTracker(Extension):
                 sentry_sdk.capture_exception(e)
                 logging.error(f"Failed to refresh trackers for {user}")
                 await asyncio.sleep(5)
-
 
         to_delete = []
         for room_id, multiworld in self.cheese.items():
@@ -828,6 +827,7 @@ class APTracker(Extension):
             sentry_sdk.capture_exception(e)
             print(e)
 
+
 def recolour_buttons(components: list[Button]) -> list[Button]:
     buttons = []
     if not components:
@@ -837,6 +837,7 @@ def recolour_buttons(components: list[Button]) -> list[Button]:
             buttons.append(Button(style=ButtonStyle.GREY, label=c.label, emoji=c.emoji, disabled=True))
     return buttons
 
+
 async def defer_ephemeral_if_guild(ctx) -> bool:
     if ctx.guild_id:
         await ctx.defer(ephemeral=True, suppress_error=True)
@@ -845,9 +846,11 @@ async def defer_ephemeral_if_guild(ctx) -> bool:
         await ctx.defer(suppress_error=True)
         return False
 
+
 def chunk(arr_range, arr_size):
     arr_range = iter(arr_range)
     return iter(lambda: tuple(itertools.islice(arr_range, arr_size)), ())
+
 
 def format_relative_time(dt):
     if dt is None or dt == datetime.datetime.min:

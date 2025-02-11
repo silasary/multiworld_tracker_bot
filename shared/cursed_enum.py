@@ -5,10 +5,9 @@ from interactions import get_logger
 
 SELF = TypeVar("SELF")
 
+
 def _log_type_mismatch(cls, value) -> None:
-    get_logger().error(
-        f"Class `{cls.__name__}` received an invalid and unexpected value `{value}`"
-    )
+    get_logger().error(f"Class `{cls.__name__}` received an invalid and unexpected value `{value}`")
 
 
 def _return_cursed_enum(cls: Type[SELF], value) -> SELF:
@@ -25,6 +24,7 @@ def _return_cursed_enum(cls: Type[SELF], value) -> SELF:
         new._value_ = value
 
     return cls._value2member_map_.setdefault(value, new)
+
 
 class CursedStrEnum(StrEnum):
     @classmethod

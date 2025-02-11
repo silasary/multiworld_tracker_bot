@@ -23,6 +23,7 @@ HintUpdate = CursedStrEnum("HintUpdate", "none new found classified useless")
 TrackerStatus = CursedStrEnum("TrackerStatus", "unknown disconnected connected ready playing goal_completed")
 CompletionStatus = CursedStrEnum("CompletionStatus", "unknown incomplete all_checks goal done released")
 
+
 @attrs.define()
 class Hint:
     id: int
@@ -57,11 +58,11 @@ class Hint:
         finder = GAMES.get(self.finder_game_id)
 
         if receiver is None:
-            receiver = CheeseGame({'name': "(Item Link)"})
+            receiver = CheeseGame({"name": "(Item Link)"})
         if finder is None:
             finder = CheeseGame()
 
-        item = f'{DATAPACKAGES[receiver.game].icon(self.item)} {self.item}'
+        item = f"{DATAPACKAGES[receiver.game].icon(self.item)} {self.item}"
         if self.is_finder:
             description = f"***{receiver.name}***'s ***{item}*** is at ***{self.location}***"
         else:
@@ -122,6 +123,7 @@ class HintFilters(enum.Flag):
 
     all = receiver | finder
 
+
 @attrs.define()
 class NetworkItem:
     name: str
@@ -132,10 +134,12 @@ class NetworkItem:
     def classification(self) -> ItemClassification:
         return DATAPACKAGES[self.game].items.get(self.name, ItemClassification.unknown)
 
+
 @attrs.define()
 class OldDatapackage:
     # game: str
     items: dict[str, OldClassification]
+
 
 @attrs.define()
 class Datapackage:
@@ -145,7 +149,7 @@ class Datapackage:
         classification = self.items.get(item_name, ItemClassification.unknown)
         emoji = "❓"
         if classification == ItemClassification.mcguffin:
-            emoji =  "✨"
+            emoji = "✨"
         if classification == ItemClassification.filler:
             emoji = "<:filler:1277502385459171338>"
         if classification == ItemClassification.useful:
@@ -155,6 +159,7 @@ class Datapackage:
         if classification == ItemClassification.trap:
             emoji = "❌"
         return emoji
+
 
 class CheeseGame(dict):
     @property
@@ -217,14 +222,15 @@ class Player:
         value = []
         for tracker in data:
             url = f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{tracker['tracker_id']}"
-            if MULTIWORLDS.get(tracker['tracker_id']) is not None:
-                value.append(MULTIWORLDS[tracker['tracker_id']])
+            if MULTIWORLDS.get(tracker["tracker_id"]) is not None:
+                value.append(MULTIWORLDS[tracker["tracker_id"]])
             else:
                 value.append(Multiworld(url))
         return value
 
     def update(self, user: interactions.User) -> None:
         self.name = user.global_name
+
 
 @attrs.define()
 class TrackedGame:
@@ -252,7 +258,6 @@ class TrackedGame:
     # hints: list[Hint] = attrs.field(factory=list)
     finder_hints: dict[int, Hint] = attrs.field(factory=dict, repr=False)
     receiver_hints: dict[int, Hint] = attrs.field(factory=dict, repr=False)
-
 
     def __hash__(self) -> int:
         return hash(self.url)
@@ -282,8 +287,8 @@ class TrackedGame:
             return []
         recieved = soup.find(id="received-table")
         if recieved is None:
-            if '/tracker/' in self.url:
-                self.url = self.url.replace('/tracker/', '/generic_tracker/')
+            if "/tracker/" in self.url:
+                self.url = self.url.replace("/tracker/", "/generic_tracker/")
                 return await self.refresh()
         headers = [i.string for i in recieved.find_all("th")]
         rows = [[try_int(i.string) for i in r.find_all("td")] for r in recieved.find_all("tr")[1:]]
@@ -410,7 +415,12 @@ class Multiworld:
     hints: list[dict] | None = None
 
     async def refresh(self, force: bool = False) -> None:
-        if self.last_refreshed and self.last_refreshed.tzinfo is not None and datetime.datetime.now(tz=datetime.UTC) - self.last_refreshed < datetime.timedelta(hours=1) and not force:
+        if (
+            self.last_refreshed
+            and self.last_refreshed.tzinfo is not None
+            and datetime.datetime.now(tz=datetime.UTC) - self.last_refreshed < datetime.timedelta(hours=1)
+            and not force
+        ):
             return
         self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
 
@@ -427,10 +437,9 @@ class Multiworld:
         MULTIWORLDS[self.tracker_id] = self
         self.last_update = datetime.datetime.fromisoformat(data.get("updated_at"))
         self.upstream_url = data.get("upstream_url")
-        self.room_link	 = data.get("room_link")
+        self.room_link = data.get("room_link")
         self.last_port = data.get("last_port")
         self.hints = data.get("hints", [])
-
 
     def last_activity(self) -> datetime.datetime:
         """
@@ -443,11 +452,13 @@ class Multiworld:
         game = converter.unstructure(game)  # convert datetime to isoformat
         requests.put(f"{self.url}/game/{game['id']}", json=game)
 
+
 def try_int(text: str) -> str | int:
     try:
         return int(text)
     except ValueError:
         return text
+
 
 DATAPACKAGES: dict[str, "Datapackage"] = defaultdict(Datapackage)
 GAMES: dict[int, CheeseGame] = {}
