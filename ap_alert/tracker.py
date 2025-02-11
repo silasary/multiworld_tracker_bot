@@ -614,99 +614,105 @@ class APTracker(Extension):
         progress = 0
 
         for user, trackers in self.trackers.copy().items():
-            player = await self.bot.fetch_user(user)
-            if not player:
-                continue
-
-            player_settings = self.players.get(player.id)
-            if player_settings is None:
-                player_settings = Player(player.id)
-                self.players[player.id] = player_settings
-            player_settings.update(player)
-
-            if player_settings.cheese_api_key:
-                cheese_dash = await player_settings.get_trackers()
-                for multiworld in cheese_dash:
-                    await self.sync_cheese(player, multiworld)
-
-            urls = set()
-            ids = set()
-            for tracker in trackers:
-                if tracker.failures >= 10:
-                    self.remove_tracker(player, tracker)
-                    await player.send(f"Tracker {tracker.url} has been removed due to errors")
-                    self.save()
+            try:
+                player = await self.bot.fetch_user(user)
+                if not player:
                     continue
 
-                if tracker.url in urls:
-                    self.remove_tracker(player, tracker)
-                    self.save()
-                    continue
-                if tracker.id in ids:
-                    self.remove_tracker(player, tracker)
-                    self.save()
-                    continue
-                urls.add(tracker.url)
-                if tracker.id:
-                    ids.add(tracker.id)
-                multiworld, _found = await self.sync_cheese(player, tracker.tracker_id)
-                if multiworld is None:
-                    tracker.failures += 1
-                    if tracker.failures >= 3:
-                        self.remove_tracker(player, tracker.url)
+                player_settings = self.players.get(player.id)
+                if player_settings is None:
+                    player_settings = Player(player.id)
+                    self.players[player.id] = player_settings
+                player_settings.update(player)
+
+                if player_settings.cheese_api_key:
+                    cheese_dash = await player_settings.get_trackers()
+                    for multiworld in cheese_dash:
+                        await self.sync_cheese(player, multiworld)
+
+                urls = set()
+                ids = set()
+                for tracker in trackers:
+                    if tracker.failures >= 10:
+                        self.remove_tracker(player, tracker)
                         await player.send(f"Tracker {tracker.url} has been removed due to errors")
-                    self.save()
-                    continue
-                should_check = tracker.last_refresh is None or tracker.last_refresh.tzinfo is None or multiworld.last_activity() > tracker.last_refresh or datetime.datetime.now(tz=datetime.UTC) - tracker.last_checked > datetime.timedelta(hours=3)
-                if should_check:
-                    new_items = await tracker.refresh()
-                else:
-                    new_items = []
-
-                try:
-                    if not new_items and tracker.failures > 10:
-                        self.remove_tracker(player, tracker.url)
-                        await player.send(f"Tracker {tracker.url} has been removed due to errors")
+                        self.save()
                         continue
-                    if new_items:
-                        await self.send_new_items(player, tracker, new_items)
-                        asyncio.create_task(self.try_classify(player, tracker, new_items))
-                except Forbidden:
-                    logging.error(f"Failed to send message to {player.global_name} ({player.id})")
-                    tracker.failures += 1
-                    continue
 
-                hints = []
-                try:
-                    hints = tracker.refresh_hints(multiworld)
-                except Exception as e:
-                    sentry_sdk.capture_exception(e)
-                    logging.error(f"Failed to get hints for {tracker.name}")
-                try:
-                    if hints:
-                        components = []
-                        if tracker.hint_filters == HintFilters.unset:
-                            components.append(Button(style=ButtonStyle.GREY, label="Configure Hint Filters",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
-                        await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints], components=components)
-                except Forbidden:
-                    logging.error(f"Failed to send message to {player.global_name} ({player.id})")
-                    tracker.failures += 1
-                    continue
-
-                tracker_count += 1
-                progress += 1
-                if should_check:
-                    # if we didn't check anything, we don't need to wait
-                    if self.tracker_count > 720:
-                        await asyncio.sleep(3) # three doesn't go into 3600 evenly, so overflows will be spread out
+                    if tracker.url in urls:
+                        self.remove_tracker(player, tracker)
+                        self.save()
+                        continue
+                    if tracker.id in ids:
+                        self.remove_tracker(player, tracker)
+                        self.save()
+                        continue
+                    urls.add(tracker.url)
+                    if tracker.id:
+                        ids.add(tracker.id)
+                    multiworld, _found = await self.sync_cheese(player, tracker.tracker_id)
+                    if multiworld is None:
+                        tracker.failures += 1
+                        if tracker.failures >= 3:
+                            self.remove_tracker(player, tracker.url)
+                            await player.send(f"Tracker {tracker.url} has been removed due to errors")
+                        self.save()
+                        continue
+                    should_check = tracker.last_refresh is None or tracker.last_refresh.tzinfo is None or multiworld.last_activity() > tracker.last_refresh or datetime.datetime.now(tz=datetime.UTC) - tracker.last_checked > datetime.timedelta(hours=3)
+                    if should_check:
+                        new_items = await tracker.refresh()
                     else:
-                        await asyncio.sleep(5)
+                        new_items = []
 
-            if trackers:
-                user_count += 1
-            if progress > 10:
-                self.save()
-                progress = 0
+                    try:
+                        if not new_items and tracker.failures > 10:
+                            self.remove_tracker(player, tracker.url)
+                            await player.send(f"Tracker {tracker.url} has been removed due to errors")
+                            continue
+                        if new_items:
+                            await self.send_new_items(player, tracker, new_items)
+                            asyncio.create_task(self.try_classify(player, tracker, new_items))
+                    except Forbidden:
+                        logging.error(f"Failed to send message to {player.global_name} ({player.id})")
+                        tracker.failures += 1
+                        continue
+
+                    hints = []
+                    try:
+                        hints = tracker.refresh_hints(multiworld)
+                    except Exception as e:
+                        sentry_sdk.capture_exception(e)
+                        logging.error(f"Failed to get hints for {tracker.name}")
+                    try:
+                        if hints:
+                            components = []
+                            if tracker.hint_filters == HintFilters.unset:
+                                components.append(Button(style=ButtonStyle.GREY, label="Configure Hint Filters",  emoji="⚙️", custom_id=f"settings:{tracker.id}"))
+                            await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints], components=components)
+                    except Forbidden:
+                        logging.error(f"Failed to send message to {player.global_name} ({player.id})")
+                        tracker.failures += 1
+                        continue
+
+                    tracker_count += 1
+                    progress += 1
+                    if should_check:
+                        # if we didn't check anything, we don't need to wait
+                        if self.tracker_count > 720:
+                            await asyncio.sleep(3) # three doesn't go into 3600 evenly, so overflows will be spread out
+                        else:
+                            await asyncio.sleep(5)
+
+                if trackers:
+                    user_count += 1
+                if progress > 10:
+                    self.save()
+                    progress = 0
+            except Exception as e:
+                sentry_sdk.capture_exception(e)
+                logging.error(f"Failed to refresh trackers for {user}")
+                await asyncio.sleep(5)
+
 
         to_delete = []
         for room_id, multiworld in self.cheese.items():
