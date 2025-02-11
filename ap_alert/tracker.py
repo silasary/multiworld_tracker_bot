@@ -626,7 +626,13 @@ class APTracker(Extension):
                 player_settings.update(player)
 
                 if player_settings.cheese_api_key:
-                    cheese_dash = await player_settings.get_trackers()
+                    try:
+                        cheese_dash = await player_settings.get_trackers()
+                    except Forbidden as e:
+                        player_settings.cheese_api_key = None
+                        self.save()
+                        await player.send("Failed to authenticate with Cheese Tracker.  Please reauthenticate with `/ap authenticate`")
+                        cheese_dash = []
                     for multiworld in cheese_dash:
                         await self.sync_cheese(player, multiworld)
 
