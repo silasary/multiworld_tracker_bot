@@ -6,13 +6,14 @@ from typing import Optional
 
 import aiohttp
 import interactions
-from interactions.client.errors import Forbidden
 from shared.cursed_enum import CursedStrEnum
 from collections import defaultdict
 
 import attrs
 import requests
 from bs4 import BeautifulSoup
+
+from shared.exceptions import BadAPIKeyException
 
 from .converter import converter
 
@@ -217,7 +218,7 @@ class Player:
             headers = {"Authorization": f"Bearer {self.cheese_api_key}"} if self.cheese_api_key else {}
             async with session.get("https://cheesetrackers.theincrediblewheelofchee.se/api/dashboard/tracker", headers=headers) as response:
                 if response.status == 401:
-                    raise Forbidden("Invalid API key.")
+                    raise BadAPIKeyException("Invalid API key.")
                 data = await response.json()
         value = []
         for tracker in data:

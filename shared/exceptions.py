@@ -36,3 +36,7 @@ class InvalidArgumentException(PDException):
 
 class LockNotAcquiredException(DatabaseException):
     pass
+
+
+class BadAPIKeyException(PDException):
+    pass

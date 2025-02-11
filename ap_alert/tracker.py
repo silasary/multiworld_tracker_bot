@@ -16,6 +16,7 @@ from interactions.models.internal.application_commands import OptionType, integr
 from interactions.models.internal.tasks import IntervalTrigger, Task
 
 from ap_alert.converter import converter
+from shared.exceptions import BadAPIKeyException
 
 from . import external_data
 from .multiworld import GAMES, Datapackage, Filters, HintFilters, ItemClassification, Multiworld, NetworkItem, Player, ProgressionStatus, TrackedGame, CompletionStatus
@@ -623,13 +624,13 @@ class APTracker(Extension):
                 if player_settings.cheese_api_key:
                     try:
                         cheese_dash = await player_settings.get_trackers()
-                    except Forbidden:
+                        for multiworld in cheese_dash:
+                            await self.sync_cheese(player, multiworld)
+                    except BadAPIKeyException:
                         player_settings.cheese_api_key = None
                         self.save()
                         await player.send("Failed to authenticate with Cheese Tracker.  Please reauthenticate with `/ap authenticate`")
-                        cheese_dash = []
-                    for multiworld in cheese_dash:
-                        await self.sync_cheese(player, multiworld)
+                cheese_dash = []
 
                 urls = set()
                 ids = set()
