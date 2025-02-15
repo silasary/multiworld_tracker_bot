@@ -39,10 +39,27 @@ class APTracker(Extension):
         self.cheese: dict[str, Multiworld] = {}
         self.datapackages: dict[str, Datapackage] = {}
         self.players: dict[int, Player] = {}
-        self.tracker_count = 0
-        self.user_count = 0
+        self.stats = {}
         self.load()
         external_data.update_all(self.datapackages)
+
+    @property
+    def user_count(self):
+        return self.stats.get("user_count", 0)
+
+    @user_count.setter
+    def user_count(self, value):
+        self.stats["user_count"] = value
+        self.save()
+
+    @property
+    def tracker_count(self):
+        return self.stats.get("tracker_count", 0)
+
+    @tracker_count.setter
+    def tracker_count(self, value):
+        self.stats["tracker_count"] = value
+        self.save()
 
     @listen()
     async def on_startup(self) -> None:
@@ -608,6 +625,7 @@ class APTracker(Extension):
         user_count = 0
         tracker_count = 0
         progress = 0
+        games = {}
 
         for user, trackers in self.trackers.copy().items():
             try:
@@ -703,6 +721,7 @@ class APTracker(Extension):
 
                     tracker_count += 1
                     progress += 1
+                    games[tracker.game] = games.get(tracker.game, 0) + 1
                     if should_check:
                         # if we didn't check anything, we don't need to wait
                         if self.tracker_count > 720:
@@ -740,6 +759,7 @@ class APTracker(Extension):
 
         self.tracker_count = tracker_count
         self.user_count = user_count
+        self.stats["games"] = games
         self.save()
         activity = Activity(name=f"{tracker_count} slots across {user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
@@ -765,8 +785,9 @@ class APTracker(Extension):
         players = json.dumps(converter.unstructure(self.players), indent=2)
         with open("players.json", "w") as f:
             f.write(players)
+        stats = json.dumps(self.stats, indent=2)
         with open("stats.json", "w") as f:
-            f.write(json.dumps({"tracker_count": self.tracker_count, "user_count": self.user_count}, indent=2))
+            f.write(stats)
 
     def load(self):
         if os.path.exists("trackers.json"):
@@ -822,8 +843,7 @@ class APTracker(Extension):
             if os.path.exists("stats.json"):
                 with open("stats.json") as f:
                     stats = json.loads(f.read())
-                    self.tracker_count = stats.get("tracker_count", 0)
-                    self.user_count = stats.get("user_count", 0)
+                    self.stats = stats
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
