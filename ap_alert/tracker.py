@@ -208,7 +208,9 @@ class APTracker(Extension):
             )
             try:
                 chosen = await self.bot.wait_for_component(msg, timeout=3600)
-                if chosen.ctx.custom_id == filler.custom_id:
+                if chosen is None:
+                    classification = ItemClassification.unknown
+                elif chosen.ctx.custom_id == filler.custom_id:
                     classification = ItemClassification.filler
                 elif chosen.ctx.custom_id == useful.custom_id:
                     classification = ItemClassification.useful
