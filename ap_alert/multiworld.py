@@ -60,7 +60,7 @@ class Hint:
         finder = GAMES.get(self.finder_game_id)
 
         if receiver is None:
-            receiver = CheeseGame({"name": "(Item Link)"})
+            receiver = CheeseGame({"name": self.item_link_name or "(Item Link)"})
         if finder is None:
             finder = CheeseGame()
 
