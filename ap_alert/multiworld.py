@@ -35,6 +35,7 @@ class Hint:
     classification: HintClassification
     finder_game_id: int
     receiver_game_id: int | None = attrs.field(default=None)
+    item_link_name: str = None
 
     update: HintUpdate = attrs.field(default=HintUpdate.none, init=False)
     is_finder: bool = attrs.field(default=False)
