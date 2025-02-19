@@ -578,8 +578,8 @@ class APTracker(Extension):
 
                 if is_mw_abandoned:
                     last_check = format_relative_time(multiworld.last_activity())
-                    await player.send(f"Game {tracker.name} has stalled, the last check in the multiworld was {last_check}. Removing tracker.")
                     self.remove_tracker(player, tracker.url)
+                    await player.send(f"Game {tracker.name} has stalled, the last check in the multiworld was {last_check}. Removing tracker.")
                     continue
                 found_tracker = True
 
