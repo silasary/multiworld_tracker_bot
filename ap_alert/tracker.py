@@ -181,12 +181,19 @@ class APTracker(Extension):
         if player is None:
             player = Player(ctx.author_id)
             self.players[ctx.author_id] = player
-        player.cheese_api_key = api_key
+        player.cheese_api_key = api_key.strip()
         await ctx.send("API key saved", ephemeral=True)
         if player.id not in self.trackers:
             self.trackers[player.id] = []
         self.save()
-        cheese_dash = await player.get_trackers()
+        try:
+            cheese_dash = await player.get_trackers()
+        except BadAPIKeyException:
+            await ctx.send("That's not a valid API Key...  Please copy it directly from https://cheesetrackers.theincrediblewheelofchee.se/settings", ephemeral=True)
+            player.cheese_api_key = None
+            self.save()
+            return
+
         for multiworld in cheese_dash:
             await self.sync_cheese(ctx.author, multiworld)
 
