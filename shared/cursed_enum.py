@@ -15,13 +15,13 @@ def _return_cursed_enum(cls: Type[SELF], value) -> SELF:
     _log_type_mismatch(cls, value)
 
     if isinstance(value, int):
-        new = int.__new__(cls)
-        new._name_ = f"UNKNOWN-TYPE-{value}"
-        new._value_ = value
+        new = int.__new__(cls)  # type: ignore
+        new._name_ = f"UNKNOWN-TYPE-{value}"  # type: ignore
+        new._value_ = value  # type: ignore
     elif isinstance(value, str):
-        new = str.__new__(cls)
-        new._name_ = value
-        new._value_ = value
+        new = str.__new__(cls)  # type: ignore
+        new._name_ = value  # type: ignore
+        new._value_ = value  # type: ignore
 
     return cls._value2member_map_.setdefault(value, new)
 

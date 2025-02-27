@@ -485,7 +485,7 @@ class APTracker(Extension):
                 colour = ButtonStyle.GREEN
             return Button(style=colour, label=name, custom_id=f"filter:{tracker.id}:{value.value}")
 
-        def hint_filter_button(name: str, value: Filters):
+        def hint_filter_button(name: str, value: HintFilters):
             colour = ButtonStyle.GREY
             if value == tracker.hint_filters:
                 colour = ButtonStyle.GREEN
@@ -526,7 +526,7 @@ class APTracker(Extension):
         await ctx.send("Hint filter updated", ephemeral=True)
         self.save()
 
-    async def sync_cheese(self, player: User, room: str) -> tuple[Multiworld, bool]:
+    async def sync_cheese(self, player: User, room: str | Multiworld) -> tuple[Multiworld, bool]:
         room, multiworld = await self.url_to_multiworld(room)
         if multiworld is None:
             return None, False
@@ -593,7 +593,7 @@ class APTracker(Extension):
 
         return multiworld, found_tracker
 
-    async def url_to_multiworld(self, room):
+    async def url_to_multiworld(self, room) -> tuple[str, Multiworld]:
         if isinstance(room, Multiworld):
             multiworld = room
             if multiworld.upstream_url is None:

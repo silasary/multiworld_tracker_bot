@@ -2,11 +2,10 @@ import datetime
 import enum
 import json
 import logging
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import aiohttp
 import interactions
-from shared.cursed_enum import CursedStrEnum
 from collections import defaultdict
 
 import attrs
@@ -16,6 +15,11 @@ from bs4 import BeautifulSoup, Tag
 from shared.exceptions import BadAPIKeyException
 
 from .converter import converter
+
+if TYPE_CHECKING:
+    from enum import StrEnum as CursedStrEnum
+else:
+    from shared.cursed_enum import CursedStrEnum
 
 OldClassification = enum.Enum("OldClassification", "unknown trap filler useful progression mcguffin")
 ProgressionStatus = CursedStrEnum("ProgressionStatus", "unknown bk go soft_bk unblocked")
@@ -35,7 +39,7 @@ class Hint:
     classification: HintClassification
     finder_game_id: int
     receiver_game_id: int | None = attrs.field(default=None)
-    item_link_name: str = None
+    item_link_name: str | None = None
 
     update: HintUpdate = attrs.field(default=HintUpdate.none, init=False)
     is_finder: bool = attrs.field(default=False)

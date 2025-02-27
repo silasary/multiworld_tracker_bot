@@ -47,6 +47,13 @@ repos:
         - id: autoflake
           args: [--remove-all-unused-imports, --in-place, --ignore-init-module-imports]
           exclude: wsgi$
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.15.0
+  #   hooks:
+  #   -   id: mypy
+  #       additional_dependencies:
+  #         - types-redis
+  #         - types-requests
 #  - repo: https://github.com/pycqa/isort
 #    rev: 5.11.4
 #    hooks:
