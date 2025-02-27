@@ -587,7 +587,7 @@ class APTracker(Extension):
                     continue
                 elif multiworld.goaled:
                     self.remove_tracker(player, tracker.url)
-                    await player.send(f"{multiworld.name} is complete, removing {tracker.name}")
+                    await player.send(f"{multiworld.title} is complete, removing {tracker.name}")
                     continue
                 found_tracker = True
 
