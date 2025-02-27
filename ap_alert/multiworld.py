@@ -465,6 +465,10 @@ class Multiworld:
         game = converter.unstructure(game)  # convert datetime to isoformat
         requests.put(f"{self.url}/game/{game['id']}", json=game)
 
+    @property
+    def goaled(self) -> bool:
+        return all(g.completion_status in [CompletionStatus.goal, CompletionStatus.done, CompletionStatus.released] for g in self.games.values())
+
 
 def process_table(table: Tag) -> list[dict]:
     headers = [i.string for i in table.find_all("th")]

@@ -558,7 +558,7 @@ class APTracker(Extension):
                 if tracker is None:
                     is_game_done = game["checks_done"] == game["checks_total"] or game.completion_status in [CompletionStatus.done, CompletionStatus.released]
                     # If either condition is true, we don't want to autotrack track this game.
-                    if is_game_done or age > datetime.timedelta(days=1) or is_mw_abandoned:
+                    if is_game_done or age > datetime.timedelta(days=1) or is_mw_abandoned or multiworld.goaled:
                         continue
 
                     tracker = TrackedGame(game["url"])
@@ -584,6 +584,10 @@ class APTracker(Extension):
                     last_check = format_relative_time(multiworld.last_activity())
                     self.remove_tracker(player, tracker.url)
                     await player.send(f"Game {tracker.name} has stalled, the last check in the multiworld was {last_check}. Removing tracker.")
+                    continue
+                elif multiworld.goaled:
+                    self.remove_tracker(player, tracker.url)
+                    await player.send(f"{multiworld.name} is complete, removing {tracker.name}")
                     continue
                 found_tracker = True
 
