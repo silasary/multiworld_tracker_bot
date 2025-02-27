@@ -11,7 +11,7 @@ from collections import defaultdict
 
 import attrs
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from shared.exceptions import BadAPIKeyException
 
@@ -257,6 +257,8 @@ class TrackedGame:
     all_items: dict[str, int] = attrs.field(factory=dict, init=False, repr=False)
     new_items: list[NetworkItem] = attrs.field(factory=list, init=False)
 
+    checks: dict[str, bool] = attrs.field(factory=dict, repr=False)
+
     # hints: list[Hint] = attrs.field(factory=list)
     finder_hints: dict[int, Hint] = attrs.field(factory=dict, repr=False)
     receiver_hints: dict[int, Hint] = attrs.field(factory=dict, repr=False)
@@ -292,15 +294,17 @@ class TrackedGame:
             if "/tracker/" in self.url:
                 self.url = self.url.replace("/tracker/", "/generic_tracker/")
                 return await self.refresh()
-        headers = [i.string for i in recieved.find_all("th")]
-        rows = [[try_int(i.string) for i in r.find_all("td")] for r in recieved.find_all("tr")[1:]]
+        # headers = [i.string for i in recieved.find_all("th")]
+        # rows = [[try_int(i.string) for i in r.find_all("td")] for r in recieved.find_all("tr")[1:]]
+        self.process_locations(soup.find(id="locations-table"))
+        rows = process_table(recieved)
         self.last_refresh = datetime.datetime.now(tz=datetime.timezone.utc)
         if not rows:
             return []
 
-        index_order = headers.index("Last Order Received")
-        index_amount = headers.index("Amount")
-        index_item = headers.index("Item")
+        index_order = "Last Order Received"
+        index_amount = "Amount"
+        index_item = "Item"
 
         rows.sort(key=lambda r: r[index_order])
         if rows[-1][index_order] < self.latest_item:
@@ -317,14 +321,14 @@ class TrackedGame:
                 item = NetworkItem(r[index_item], self.game, r[index_amount])
                 new_items.append(item)
                 if DATAPACKAGES.get(self.game) is not None:
-                    classification = DATAPACKAGES[self.game].items.get(r[0])
+                    classification = DATAPACKAGES[self.game].items.get(r[index_item])
                     if classification in [ItemClassification.progression, ItemClassification.mcguffin]:
-                        self.last_progression = (r[0], datetime.datetime.now(tz=datetime.UTC))
+                        self.last_progression = (r[index_item], datetime.datetime.now(tz=datetime.UTC))
 
         if is_up_to_date:
             return []
 
-        self.last_item = (rows[-1][0], datetime.datetime.now(tz=datetime.UTC))
+        self.last_item = (rows[-1][index_item], datetime.datetime.now(tz=datetime.UTC))
         self.last_recieved = datetime.datetime.now(tz=datetime.UTC)
 
         self.latest_item = rows[-1][index_order]
@@ -338,6 +342,13 @@ class TrackedGame:
         new_items = [i for i in new_items if i.classification == ItemClassification.unknown or self.filters & Filters(i.classification.value)]
 
         return new_items
+
+    def process_locations(self, table: Tag) -> None:
+        if table is None:
+            return
+        rows = process_table(table)
+        for r in rows:
+            self.checks[r["Location"]] = bool(r["Checked"])
 
     def update(self, data: CheeseGame) -> None:
         self.game = data.game
@@ -455,7 +466,14 @@ class Multiworld:
         requests.put(f"{self.url}/game/{game['id']}", json=game)
 
 
+def process_table(table: Tag) -> list[dict]:
+    headers = [i.string for i in table.find_all("th")]
+    rows = [[try_int(i.string) for i in r.find_all("td")] for r in table.find_all("tr")[1:]]
+    return [dict(zip(headers, r)) for r in rows]
+
+
 def try_int(text: str) -> str | int:
+    text = text.strip()
     try:
         return int(text)
     except ValueError:
