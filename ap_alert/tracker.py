@@ -8,7 +8,20 @@ import itertools
 
 import requests
 import sentry_sdk
-from interactions import Activity, ActivityType, Client, ComponentContext, Extension, SlashContext, component_callback, listen, Timestamp, TimestampStyles, spread_to_rows
+from interactions import (
+    ActionRow,
+    Activity,
+    ActivityType,
+    Client,
+    ComponentContext,
+    Extension,
+    SlashContext,
+    component_callback,
+    listen,
+    Timestamp,
+    TimestampStyles,
+    spread_to_rows,
+)
 from interactions.client.errors import Forbidden, NotFound
 from interactions.ext.paginators import Paginator
 from interactions.models.discord import Button, ButtonStyle, User, Embed, Message
@@ -642,7 +655,7 @@ class APTracker(Extension):
         user_count = 0
         tracker_count = 0
         progress = 0
-        games = {}
+        games: dict[str, int] = {}
 
         for user, trackers in self.trackers.copy().items():
             try:
@@ -866,7 +879,7 @@ class APTracker(Extension):
             print(e)
 
 
-def recolour_buttons(components: list[Button]) -> list[Button]:
+def recolour_buttons(components: list[ActionRow]) -> list[Button]:
     buttons = []
     if not components:
         return []

@@ -444,9 +444,9 @@ class Multiworld:
         logging.info(f"Refreshing {self.url}")
         async with aiohttp.ClientSession() as session:
             async with session.get(self.url) as response:
-                data = await response.text()
+                txt = await response.text()
         # data = requests.get(self.url).text
-        data = json.loads(data)
+        data = json.loads(txt)
         self.tracker_id = data.get("tracker_id")
         self.title = data.get("title", self.title)
         self.games = {g["position"]: CheeseGame(g) for g in data.get("games")}
