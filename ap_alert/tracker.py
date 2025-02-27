@@ -20,7 +20,7 @@ from shared.exceptions import BadAPIKeyException
 
 from . import external_data
 from .multiworld import GAMES, Datapackage, Filters, HintFilters, ItemClassification, Multiworld, NetworkItem, Player, ProgressionStatus, TrackedGame, CompletionStatus
-
+from .worlds import TRACKERS
 
 regex_dash = re.compile(r"dash:(\d+)")
 regex_unblock = re.compile(r"unblock:(\d+)")
@@ -401,8 +401,10 @@ class APTracker(Extension):
 
         if not is_owner or only_game:
             components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji="🗑️", custom_id=f"remove:{tracker.id}"))
-
-        return await ctx.send(embed=embed, components=spread_to_rows(*components), ephemeral=True)
+        embeds = [embed]
+        if TRACKERS.get(tracker.game) and (dash := await TRACKERS[tracker.game].build_dashboard(tracker)):
+            embeds.append(dash)
+        return await ctx.send(embeds=embeds, components=spread_to_rows(*components), ephemeral=True)
 
     @component_callback(regex_remove)
     async def remove(self, ctx: ComponentContext) -> None:
