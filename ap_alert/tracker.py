@@ -331,6 +331,8 @@ class APTracker(Extension):
             if tracker.name is None:
                 tracker.name = f"{tracker.tracker_id} #{tracker.slot_id}"
             name = tracker.name.replace("*", "")
+            if len(name) > 80:
+                name = f"{name[:70]} #{tracker.slot_id}"
             colour = ButtonStyle.BLUE
             if tracker.progression_status == ProgressionStatus.bk:
                 colour = ButtonStyle.RED
