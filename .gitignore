@@ -13,3 +13,4 @@ config.json
 /gamedata.json
 /stats.json
 /players.json
+/world_data/
