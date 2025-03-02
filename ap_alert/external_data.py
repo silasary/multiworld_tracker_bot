@@ -22,38 +22,34 @@ async def update_datapackage() -> None:
 
 
 def clone_repo() -> None:
-    repo_url = "https://github.com/Zoggoth/Zoggoths-Archipelago-Multitracker.git"
-    if os.path.exists("zoggoth_repo"):
-        subprocess.run(["git", "reset", "--hard", "origin/main"], cwd="zoggoth_repo")
-        subprocess.run(["git", "pull"], cwd="zoggoth_repo")
-        subprocess.run(["git", "pull", "silasary", "main"], cwd="zoggoth_repo")
+    repo_url = "https://github.com/silasary/world_data.git"
+    if os.path.exists("world_data"):
+        subprocess.run(["git", "reset", "--hard", "origin/main"], cwd="world_data")
+        subprocess.run(["git", "pull"], cwd="world_data")
     else:
-        subprocess.run(["git", "clone", repo_url, "zoggoth_repo"])
-        subprocess.run(["git", "remote", "add", "silasary", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
-        subprocess.run(["git", "pull", "silasary", "main"], cwd="zoggoth_repo")
+        subprocess.run(["git", "clone", repo_url, "world_data"])
 
 
 def update_all(dps: dict[str, Datapackage]) -> None:
     """Update all datapackages."""
     for name, dp in dps.items():
-        load_datapackage(name, dp)
+        import_datapackage(name, dp)
 
 
-def load_datapackage(name: str, dp: Datapackage) -> None:
+def import_datapackage(name: str, dp: Datapackage) -> None:
     logging.info(f"Loading datapackage {name}")
     if name is None:
         return
+    if name in ["None", "null"]:
+        return
 
     DATAPACKAGES[name] = dp
-    if not os.path.exists("zoggoth_repo"):
+    if not os.path.exists("world_data"):
         clone_repo()
-    if not os.path.exists(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")):
-        if name in ["None", "null"]:
-            return
-
+    if not os.path.exists(os.path.join("world_data", "worlds", name, "progression.txt")):
         logging.info(f"Datapackage {name} not found in Zoggoth's repo.")
-        os.makedirs(os.path.join("zoggoth_repo", "worlds", name), exist_ok=True)
-        with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "w") as f:
+        os.makedirs(os.path.join("world_data", "worlds", name), exist_ok=True)
+        with open(os.path.join("world_data", "worlds", name, "progression.txt"), "w") as f:
             f.write("")
 
     set(dp.items.keys())
@@ -63,7 +59,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
 
     trailing_newline = True
 
-    with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt")) as f:
+    with open(os.path.join("world_data", "worlds", name, "progression.txt")) as f:
         for line in f:
             if not line.strip():
                 trailing_newline = True
@@ -86,9 +82,9 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
 
     written = False
     if to_replace:
-        with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "r") as f:
+        with open(os.path.join("world_data", "worlds", name, "progression.txt"), "r") as f:
             lines = f.readlines()
-        with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "w") as f:
+        with open(os.path.join("world_data", "worlds", name, "progression.txt"), "w") as f:
             for line in lines:
                 if not line.strip():
                     f.write("\n")
@@ -102,7 +98,7 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
                     f.write(line)
             written = True
     if to_append:
-        with open(os.path.join("zoggoth_repo", "worlds", name, "progression.txt"), "a") as f:
+        with open(os.path.join("world_data", "worlds", name, "progression.txt"), "a") as f:
             if not trailing_newline:
                 f.write("\n")
             for item in to_append:
@@ -114,14 +110,14 @@ def load_datapackage(name: str, dp: Datapackage) -> None:
 
     if written:
         to_append = to_append | to_replace
-        subprocess.run(["git", "add", f"worlds/{name}/progression.txt"], cwd="zoggoth_repo")
+        subprocess.run(["git", "add", f"worlds/{name}/progression.txt"], cwd="world_data")
         if len(to_append) < 4:
             message = f"{name}: Add {', '.join(to_append)}"
         else:
             message = f"{name}: Add {len(to_append)} items"
-        subprocess.run(["git", "commit", "-m", message], cwd="zoggoth_repo")
-        subprocess.run(["git", "push", "-u", "git@github.com:silasary/Zoggoths-Archipelago-Multitracker.git"], cwd="zoggoth_repo")
-        subprocess.run(["git", "checkout", "main"], cwd="zoggoth_repo")
+        subprocess.run(["git", "commit", "-m", message], cwd="world_data")
+        subprocess.run(["git", "push", "-u", "git@github.com:silasary/world_data.git"], cwd="world_data")
+        subprocess.run(["git", "checkout", "main"], cwd="world_data")
 
 
 clone_repo()
