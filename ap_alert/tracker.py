@@ -54,7 +54,6 @@ class APTracker(Extension):
         self.players: dict[int, Player] = {}
         self.stats = {}
         self.load()
-        external_data.update_all(self.datapackages)
 
     @property
     def user_count(self):
@@ -76,6 +75,7 @@ class APTracker(Extension):
 
     @listen()
     async def on_startup(self) -> None:
+        await external_data.update_datapackage()
         self.refresh_all.start()
         self.refresh_all.trigger.last_call_time = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=1)
         external_data.update_datapackage.start()
@@ -154,7 +154,7 @@ class APTracker(Extension):
 
         if tracker.game not in self.datapackages:
             self.datapackages[tracker.game] = Datapackage(items={})
-            external_data.load_datapackage(tracker.game, self.datapackages[tracker.game])
+            external_data.import_datapackage(tracker.game, self.datapackages[tracker.game])
 
     @ap.subcommand("refresh")
     async def ap_refresh(self, ctx: SlashContext) -> None:
@@ -758,6 +758,8 @@ class APTracker(Extension):
                             await asyncio.sleep(3)  # three doesn't go into 3600 evenly, so overflows will be spread out
                         else:
                             await asyncio.sleep(5)
+                    else:
+                        await asyncio.sleep(0)
 
                 if trackers:
                     user_count += 1
@@ -797,7 +799,7 @@ class APTracker(Extension):
     def get_classification(self, game, item):
         if game not in self.datapackages:
             self.datapackages[game] = Datapackage(items={})
-            external_data.load_datapackage(game, self.datapackages[game])
+            external_data.import_datapackage(game, self.datapackages[game])
         if item not in self.datapackages[game].items:
             self.datapackages[game].items[item] = ItemClassification.unknown
         return self.datapackages[game].items[item]

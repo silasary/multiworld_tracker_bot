@@ -5,7 +5,9 @@ Temporary until https://github.com/ArchipelagoMW/Archipelago/pull/1052 gets merg
 """
 import logging
 import os
+import asyncio
 import subprocess
+import sys
 
 from interactions.models.internal.tasks import IntervalTrigger, Task
 
@@ -14,29 +16,40 @@ from .multiworld import Datapackage, ItemClassification, DATAPACKAGES
 classifications = {v.name: v for v in ItemClassification}
 
 
+async def git(args: list[str], cwd: str) -> None:
+    """Run a git command."""
+    logging.info(f"Running git {' '.join(args)} in {cwd}")
+    if sys.platform == "win32":
+        subprocess.run(["git", *args], cwd=cwd)
+    else:
+        await asyncio.subprocess.create_subprocess_exec("git", *args, cwd=cwd)
+
+
 @Task.create(IntervalTrigger(days=1))
 async def update_datapackage() -> None:
     """Update the datapackage."""
-    clone_repo()
-    update_all(DATAPACKAGES)
+    await clone_repo()
+    await update_all(DATAPACKAGES)
 
 
-def clone_repo() -> None:
-    repo_url = "https://github.com/silasary/world_data.git"
+async def clone_repo() -> None:
+    repo_url = "git@github.com:silasary/world_data.git"
     if os.path.exists("world_data"):
-        subprocess.run(["git", "reset", "--hard", "origin/main"], cwd="world_data")
-        subprocess.run(["git", "pull"], cwd="world_data")
+        await git(["clean", "-fdx"], cwd="world_data")
+        await git(["pull"], cwd="world_data")
+        # await git(["reset", "--hard "origin/main"], cwd="world_data")
+
     else:
-        subprocess.run(["git", "clone", repo_url, "world_data"])
+        await git(["clone", repo_url, "world_data"])
 
 
-def update_all(dps: dict[str, Datapackage]) -> None:
+async def update_all(dps: dict[str, Datapackage]) -> None:
     """Update all datapackages."""
     for name, dp in dps.items():
-        import_datapackage(name, dp)
+        await import_datapackage(name, dp)
 
 
-def import_datapackage(name: str, dp: Datapackage) -> None:
+async def import_datapackage(name: str, dp: Datapackage) -> None:
     logging.info(f"Loading datapackage {name}")
     if name is None:
         return
@@ -45,7 +58,7 @@ def import_datapackage(name: str, dp: Datapackage) -> None:
 
     DATAPACKAGES[name] = dp
     if not os.path.exists("world_data"):
-        clone_repo()
+        await clone_repo()
     if not os.path.exists(os.path.join("world_data", "worlds", name, "progression.txt")):
         logging.info(f"Datapackage {name} not found in Zoggoth's repo.")
         os.makedirs(os.path.join("world_data", "worlds", name), exist_ok=True)
@@ -110,14 +123,11 @@ def import_datapackage(name: str, dp: Datapackage) -> None:
 
     if written:
         to_append = to_append | to_replace
-        subprocess.run(["git", "add", f"worlds/{name}/progression.txt"], cwd="world_data")
+        await git(["add", f"worlds/{name}/progression.txt"], cwd="world_data")
         if len(to_append) < 4:
             message = f"{name}: Add {', '.join(to_append)}"
         else:
             message = f"{name}: Add {len(to_append)} items"
-        subprocess.run(["git", "commit", "-m", message], cwd="world_data")
-        subprocess.run(["git", "push", "-u", "git@github.com:silasary/world_data.git"], cwd="world_data")
-        subprocess.run(["git", "checkout", "main"], cwd="world_data")
-
-
-clone_repo()
+        await git(["commit", "-m", message], cwd="world_data")
+        await git(["push", "-u", "git@github.com:silasary/world_data.git"], cwd="world_data")
+        await git(["checkout", "main"], cwd="world_data")
