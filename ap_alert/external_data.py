@@ -22,7 +22,8 @@ async def git(args: list[str], cwd: str) -> None:
     if sys.platform == "win32":
         subprocess.run(["git", *args], cwd=cwd)
     else:
-        await asyncio.subprocess.create_subprocess_exec("git", *args, cwd=cwd)
+        process = await asyncio.subprocess.create_subprocess_exec("git", *args, cwd=cwd)
+        await process.wait()
 
 
 @Task.create(IntervalTrigger(days=1))
