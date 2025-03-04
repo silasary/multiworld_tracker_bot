@@ -75,7 +75,7 @@ class APTracker(Extension):
 
     @listen()
     async def on_startup(self) -> None:
-        await external_data.update_datapackage()
+        await external_data.update_all(self.datapackages)
         self.refresh_all.start()
         self.refresh_all.trigger.last_call_time = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=1)
         external_data.update_datapackage.start()
@@ -133,7 +133,7 @@ class APTracker(Extension):
             await multiworld.refresh()
             slot = multiworld.games[int(url.split("/")[-1])]
             tracker.game = slot["game"]
-            self.check_for_dp(tracker)
+            await self.check_for_dp(tracker)
 
             tracker.name = f"{room} - **{slot['name']}**"
             await self.ap_refresh(ctx)
@@ -148,13 +148,13 @@ class APTracker(Extension):
                 return
             await self.ap_refresh(ctx)
 
-    def check_for_dp(self, tracker):
+    async def check_for_dp(self, tracker):
         if tracker.game is None:
             return
 
-        if tracker.game not in self.datapackages:
+        if tracker.game not in self.datapackages or not self.datapackages[tracker.game].items:
             self.datapackages[tracker.game] = Datapackage(items={})
-            external_data.import_datapackage(tracker.game, self.datapackages[tracker.game])
+            await external_data.import_datapackage(tracker.game, self.datapackages[tracker.game])
 
     @ap.subcommand("refresh")
     async def ap_refresh(self, ctx: SlashContext) -> None:
@@ -213,7 +213,6 @@ class APTracker(Extension):
     async def try_classify(self, ctx: SlashContext | User, tracker: TrackedGame, new_items: list[NetworkItem], ephemeral: bool = False) -> None:
         if tracker.game is None:
             return
-
         unclassified = [i.name for i in new_items if i.classification == ItemClassification.unknown]
         for item in unclassified:
             trap = Button(style=ButtonStyle.RED, label="Trap", emoji="❌")
@@ -578,7 +577,7 @@ class APTracker(Extension):
                     self.trackers[player.id].append(tracker)
                     self.save()
                     tracker.game = game["game"]
-                    self.check_for_dp(tracker)
+                    await self.check_for_dp(tracker)
 
             if tracker:
                 if multiworld.title:
@@ -796,10 +795,10 @@ class APTracker(Extension):
         activity = Activity(name=f"{tracker_count} slots across {user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
 
-    def get_classification(self, game, item):
+    async def get_classification(self, game, item):
         if game not in self.datapackages:
             self.datapackages[game] = Datapackage(items={})
-            external_data.import_datapackage(game, self.datapackages[game])
+            await external_data.import_datapackage(game, self.datapackages[game])
         if item not in self.datapackages[game].items:
             self.datapackages[game].items[item] = ItemClassification.unknown
         return self.datapackages[game].items[item]
