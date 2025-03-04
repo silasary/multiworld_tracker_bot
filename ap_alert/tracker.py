@@ -758,6 +758,8 @@ class APTracker(Extension):
                             await asyncio.sleep(3)  # three doesn't go into 3600 evenly, so overflows will be spread out
                         else:
                             await asyncio.sleep(5)
+                    else:
+                        await asyncio.sleep(0)
 
                 if trackers:
                     user_count += 1
