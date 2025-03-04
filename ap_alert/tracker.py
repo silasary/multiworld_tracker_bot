@@ -154,7 +154,7 @@ class APTracker(Extension):
 
         if tracker.game not in self.datapackages:
             self.datapackages[tracker.game] = Datapackage(items={})
-            external_data.load_datapackage(tracker.game, self.datapackages[tracker.game])
+            external_data.import_datapackage(tracker.game, self.datapackages[tracker.game])
 
     @ap.subcommand("refresh")
     async def ap_refresh(self, ctx: SlashContext) -> None:
@@ -797,7 +797,7 @@ class APTracker(Extension):
     def get_classification(self, game, item):
         if game not in self.datapackages:
             self.datapackages[game] = Datapackage(items={})
-            external_data.load_datapackage(game, self.datapackages[game])
+            external_data.import_datapackage(game, self.datapackages[game])
         if item not in self.datapackages[game].items:
             self.datapackages[game].items[item] = ItemClassification.unknown
         return self.datapackages[game].items[item]
