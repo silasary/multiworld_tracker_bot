@@ -22,7 +22,8 @@ async def git(args: list[str], cwd: str) -> None:
     if sys.platform == "win32":
         subprocess.run(["git", *args], cwd=cwd)
     else:
-        await asyncio.subprocess.create_subprocess_exec("git", *args, cwd=cwd)
+        process = await asyncio.subprocess.create_subprocess_exec("git", *args, cwd=cwd)
+        await process.wait()
 
 
 @Task.create(IntervalTrigger(days=1))
@@ -57,6 +58,7 @@ async def import_datapackage(name: str, dp: Datapackage) -> None:
         return
 
     DATAPACKAGES[name] = dp
+    written = False
     if not os.path.exists("world_data"):
         await clone_repo()
     if not os.path.exists(os.path.join("world_data", "worlds", name, "progression.txt")):
@@ -64,6 +66,7 @@ async def import_datapackage(name: str, dp: Datapackage) -> None:
         os.makedirs(os.path.join("world_data", "worlds", name), exist_ok=True)
         with open(os.path.join("world_data", "worlds", name, "progression.txt"), "w") as f:
             f.write("")
+            written = True
 
     set(dp.items.keys())
     to_append = set(k for k, v in dp.items.items() if v not in [ItemClassification.unknown, ItemClassification.bad_name])
@@ -93,7 +96,7 @@ async def import_datapackage(name: str, dp: Datapackage) -> None:
                 logging.error(f"Unknown classification `{value}` for item {key} in {name}.")
             trailing_newline = line.endswith("\n")
 
-    written = False
+    # written = False
     if to_replace:
         with open(os.path.join("world_data", "worlds", name, "progression.txt"), "r") as f:
             lines = f.readlines()
@@ -124,10 +127,12 @@ async def import_datapackage(name: str, dp: Datapackage) -> None:
     if written:
         to_append = to_append | to_replace
         await git(["add", f"worlds/{name}/progression.txt"], cwd="world_data")
-        if len(to_append) < 4:
+        if not to_append:
+            message = f"{name}: Create progression.txt"
+        elif len(to_append) < 4:
             message = f"{name}: Add {', '.join(to_append)}"
         else:
             message = f"{name}: Add {len(to_append)} items"
         await git(["commit", "-m", message], cwd="world_data")
         await git(["push", "-u", "git@github.com:silasary/world_data.git"], cwd="world_data")
-        await git(["checkout", "main"], cwd="world_data")
+        # await git(["checkout", "main"], cwd="world_data")
