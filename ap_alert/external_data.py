@@ -25,8 +25,8 @@ def clone_repo() -> None:
     repo_url = "https://github.com/silasary/world_data.git"
     if os.path.exists("world_data"):
         subprocess.run(["git", "clean", "-fdx"], cwd="world_data")
-        subprocess.run(["git", "fetch"], cwd="world_data")
-        subprocess.run(["git", "reset", "--hard", "origin/main"], cwd="world_data")
+        subprocess.run(["git", "pull"], cwd="world_data")
+        # subprocess.run(["git", "reset", "--hard", "origin/main"], cwd="world_data")
 
     else:
         subprocess.run(["git", "clone", repo_url, "world_data"])
