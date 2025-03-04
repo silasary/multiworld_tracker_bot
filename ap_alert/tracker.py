@@ -54,7 +54,6 @@ class APTracker(Extension):
         self.players: dict[int, Player] = {}
         self.stats = {}
         self.load()
-        external_data.update_all(self.datapackages)
 
     @property
     def user_count(self):
@@ -76,6 +75,7 @@ class APTracker(Extension):
 
     @listen()
     async def on_startup(self) -> None:
+        await external_data.update_datapackage()
         self.refresh_all.start()
         self.refresh_all.trigger.last_call_time = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=1)
         external_data.update_datapackage.start()
