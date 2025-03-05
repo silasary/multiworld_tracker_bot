@@ -327,7 +327,7 @@ class TrackedGame:
                 item = NetworkItem(r[index_item], self.game, r[index_amount])
                 new_items.append(item)
                 if DATAPACKAGES.get(self.game) is not None:
-                    classification = DATAPACKAGES[self.game].items.get(r[index_item])
+                    classification = DATAPACKAGES[self.game].items.setdefault(r[index_item], ItemClassification.unknown)
                     if classification in [ItemClassification.progression, ItemClassification.mcguffin]:
                         self.last_progression = (r[index_item], datetime.datetime.now(tz=datetime.UTC))
 
