@@ -276,7 +276,7 @@ class APTracker(Extension):
             emoji = "❓"
 
             if tracker.game in self.datapackages:
-                classification = self.datapackages[tracker.game].items.get(item.name, ItemClassification.unknown)
+                classification = self.datapackages[tracker.game].items.setdefault(item.name, ItemClassification.unknown)
                 if inventory and classification == ItemClassification.unknown:
                     await self.try_classify(ctx_or_user, tracker, new_items)
                     classification = self.datapackages[tracker.game].items[item.name]

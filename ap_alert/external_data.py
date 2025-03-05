@@ -18,7 +18,7 @@ classifications = {v.name: v for v in ItemClassification}
 
 async def git(args: list[str], cwd: str) -> int:
     """Run a git command."""
-    logging.info(f"Running git {' '.join(args)} in {cwd}")
+    print(f"Running git {' '.join(args)} in {cwd}")
     if sys.platform == "win32":
         try:
             subprocess.run(["git", *args], cwd=cwd, check=True)
@@ -71,7 +71,7 @@ async def import_datapackage(name: str, dp: Datapackage) -> None:
         os.makedirs(os.path.join("world_data", "worlds", name), exist_ok=True)
         with open(os.path.join("world_data", "worlds", name, "progression.txt"), "w") as f:
             f.write("")
-            written = True
+            # written = True
 
     set(dp.items.keys())
     to_append = set(k for k, v in dp.items.items() if v not in [ItemClassification.unknown, ItemClassification.bad_name])
