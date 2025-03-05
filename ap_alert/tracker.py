@@ -97,6 +97,8 @@ class APTracker(Extension):
             await ctx.send("AAAAAAAAAAAAAA is an example room.  Please use the url for your async instead.", ephemeral=True)
             return
 
+        ephemeral = await defer_ephemeral_if_guild(ctx)
+
         try:
             await ctx.author.fetch_dm()  # Make sure we can send DMs to this player
         except Forbidden:
@@ -110,7 +112,6 @@ class APTracker(Extension):
             await ctx.send("Please use the tracker URL, not the port number", ephemeral=True)
             return
 
-        ephemeral = await defer_ephemeral_if_guild(ctx)
 
         if url.split("/")[-1].isnumeric():
             # Track slot
@@ -360,7 +361,7 @@ class APTracker(Extension):
             if tracker.id == -1:
                 tracker.id = min(trackers, key=lambda x: x.id).id - 1
 
-            buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.id}"))
+            buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.id}", disabled=tracker.id == -1))
         buttons.sort(key=lambda x: x.style)
         pages = chunk(buttons, 25)
         for page in pages:
