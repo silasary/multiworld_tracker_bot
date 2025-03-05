@@ -254,10 +254,12 @@ class APTracker(Extension):
                     ephemeral = False
 
             except TimeoutError:
-                await msg.channel.delete_message(msg)
+                if not ephemeral:
+                    await msg.channel.delete_message(msg)
                 break
             try:
-                await msg.channel.delete_message(msg)
+                if not ephemeral:
+                    await msg.channel.delete_message(msg)
             except NotFound:
                 pass
             except Forbidden:

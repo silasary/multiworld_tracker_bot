@@ -31,7 +31,7 @@ async def git(args: list[str], cwd: str) -> int:
         return code
 
 
-@Task.create(IntervalTrigger(days=1))
+@Task.create(IntervalTrigger(hours=1))
 async def update_datapackage() -> None:
     """Update the datapackage."""
     await clone_repo()
