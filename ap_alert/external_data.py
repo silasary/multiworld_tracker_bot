@@ -16,14 +16,19 @@ from .multiworld import Datapackage, ItemClassification, DATAPACKAGES
 classifications = {v.name: v for v in ItemClassification}
 
 
-async def git(args: list[str], cwd: str) -> None:
+async def git(args: list[str], cwd: str) -> int:
     """Run a git command."""
     logging.info(f"Running git {' '.join(args)} in {cwd}")
     if sys.platform == "win32":
-        subprocess.run(["git", *args], cwd=cwd)
+        try:
+            subprocess.run(["git", *args], cwd=cwd, check=True)
+            return 0
+        except subprocess.CalledProcessError as e:
+            return e.returncode
     else:
         process = await asyncio.subprocess.create_subprocess_exec("git", *args, cwd=cwd)
-        await process.wait()
+        code = await process.wait()
+        return code
 
 
 @Task.create(IntervalTrigger(days=1))
@@ -37,7 +42,7 @@ async def clone_repo() -> None:
     repo_url = "git@github.com:silasary/world_data.git"
     if os.path.exists("world_data"):
         await git(["clean", "-fdx"], cwd="world_data")
-        await git(["pull"], cwd="world_data")
+        await git(["pull", "--commit"], cwd="world_data")
         # await git(["reset", "--hard "origin/main"], cwd="world_data")
 
     else:
