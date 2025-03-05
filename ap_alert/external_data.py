@@ -42,7 +42,7 @@ async def clone_repo() -> None:
     repo_url = "git@github.com:silasary/world_data.git"
     if os.path.exists("world_data"):
         await git(["clean", "-fdx"], cwd="world_data")
-        await git(["pull", "--commit"], cwd="world_data")
+        await git(["pull", "--commit", "origin", "main"], cwd="world_data")
         # await git(["reset", "--hard "origin/main"], cwd="world_data")
 
     else:
@@ -139,5 +139,5 @@ async def import_datapackage(name: str, dp: Datapackage) -> None:
         else:
             message = f"{name}: Add {len(to_append)} items"
         await git(["commit", "-m", message], cwd="world_data")
-        await git(["push", "-u", "git@github.com:silasary/world_data.git"], cwd="world_data")
+        await git(["push", "git@github.com:silasary/world_data.git"], cwd="world_data")
         # await git(["checkout", "main"], cwd="world_data")
