@@ -119,7 +119,7 @@ async def import_datapackage(name: str, dp: Datapackage) -> None:
                 f.write("\n")
             for item in to_append:
                 v = dp.items[item]
-                if v in [ItemClassification.unknown, ItemClassification.bad_name]:
+                if v == ItemClassification.bad_name:
                     continue
                 f.write(f"{item}: {v.name}\n")
                 written = True
