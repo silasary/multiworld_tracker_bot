@@ -15,6 +15,7 @@ from interactions import (
     Client,
     ComponentContext,
     Extension,
+    InteractionContext,
     SlashContext,
     component_callback,
     listen,
@@ -214,6 +215,7 @@ class APTracker(Extension):
         if tracker.game is None:
             return
         unclassified = [i.name for i in new_items if i.classification == ItemClassification.unknown]
+        n = 0
         for item in unclassified:
             trap = Button(style=ButtonStyle.RED, label="Trap", emoji="❌")
             filler = Button(style=ButtonStyle.GREY, label="Filler", emoji="<:filler:1277502385459171338>")
@@ -245,6 +247,11 @@ class APTracker(Extension):
                     self.datapackages[tracker.game] = Datapackage(items={})
                 self.datapackages[tracker.game].items[item] = classification
                 await chosen.ctx.send(f"✅{item} is {classification}", ephemeral=True)
+                n += 1
+                if n > 3 and isinstance(ctx, InteractionContext):
+                    ctx = ctx.author
+                    ephemeral = False
+
             except TimeoutError:
                 await msg.channel.delete_message(msg)
                 break
