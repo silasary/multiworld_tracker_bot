@@ -361,7 +361,7 @@ class APTracker(Extension):
             if tracker.id == -1:
                 tracker.id = min(trackers, key=lambda x: x.id).id - 1
 
-            buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.id}", disabled=tracker.id == -1))
+            buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.id}", disabled=tracker.id < 1))
         buttons.sort(key=lambda x: x.style)
         pages = chunk(buttons, 25)
         for page in pages:

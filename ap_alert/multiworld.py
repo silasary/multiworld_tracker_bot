@@ -280,6 +280,8 @@ class TrackedGame:
         return int(self.url.split("/")[-1])
 
     async def refresh(self) -> list[NetworkItem]:
+        if self.game is None:
+            await self.refresh_metadata()
         logging.info(f"Refreshing {self.url}")
         async with aiohttp.ClientSession() as session:
             async with session.get(self.url) as response:
@@ -346,6 +348,27 @@ class TrackedGame:
         new_items = [i for i in new_items if i.classification == ItemClassification.unknown or self.filters & Filters(i.classification.value)]
 
         return new_items
+
+    async def refresh_metadata(self) -> None:
+        logging.info(f"Refreshing metadata for {self.url}")
+        multitracker_url = '/'.join(self.url.split("/")[:-2])
+        async with aiohttp.ClientSession() as session:
+            async with session.get(multitracker_url) as response:
+                if response.status != 200:
+                    self.failures += 1
+                    return
+                html = await response.text()
+        soup = BeautifulSoup(html, features="html.parser")
+        title = soup.find("title").string
+        if title == "Page Not Found (404)":
+            self.failures += 1
+            return
+        slots = process_table(soup.find(id="checks-table"))
+        for slot in slots:
+            if slot['#'] == self.slot_id:
+                self.game = slot['Game']
+                # self.name = slot['Name']
+                break
 
     def process_locations(self, table: Tag) -> None:
         if table is None:
@@ -476,11 +499,16 @@ class Multiworld:
 
 def process_table(table: Tag) -> list[dict]:
     headers = [i.string for i in table.find_all("th")]
-    rows = [[try_int(i.string) for i in r.find_all("td")] for r in table.find_all("tr")[1:]]
+    rows = [[try_int(i) for i in r.find_all("td")] for r in table.find_all("tr")[1:]]
     return [dict(zip(headers, r)) for r in rows]
 
 
-def try_int(text: str) -> str | int:
+def try_int(text: Tag | str) -> str | int:
+    if isinstance(text, Tag):
+        if text.string:
+            text = text.string
+        else:
+            text = text.get_text()
     text = text.strip()
     try:
         return int(text)
