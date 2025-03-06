@@ -66,10 +66,12 @@ async def import_datapackage(name: str, dp: Datapackage) -> None:
     written = False
     if not os.path.exists("world_data"):
         await clone_repo()
-    if not os.path.exists(os.path.join("world_data", "worlds", name, "progression.txt")):
+    safe_name = name.replace("/", "_").replace(":", "_")
+    prog_txt = os.path.join("world_data", "worlds", safe_name, "progression.txt")
+    if not os.path.exists(prog_txt):
         logging.info(f"Datapackage {name} not found in Zoggoth's repo.")
-        os.makedirs(os.path.join("world_data", "worlds", name), exist_ok=True)
-        with open(os.path.join("world_data", "worlds", name, "progression.txt"), "w") as f:
+        os.makedirs(os.path.join("world_data", "worlds", safe_name), exist_ok=True)
+        with open(prog_txt, "w") as f:
             f.write("")
             # written = True
 
@@ -80,7 +82,7 @@ async def import_datapackage(name: str, dp: Datapackage) -> None:
 
     trailing_newline = True
 
-    with open(os.path.join("world_data", "worlds", name, "progression.txt")) as f:
+    with open(prog_txt) as f:
         for line in f:
             if not line.strip():
                 trailing_newline = True
@@ -103,9 +105,9 @@ async def import_datapackage(name: str, dp: Datapackage) -> None:
 
     # written = False
     if to_replace:
-        with open(os.path.join("world_data", "worlds", name, "progression.txt"), "r") as f:
+        with open(prog_txt, "r") as f:
             lines = f.readlines()
-        with open(os.path.join("world_data", "worlds", name, "progression.txt"), "w") as f:
+        with open(prog_txt, "w") as f:
             for line in lines:
                 if not line.strip():
                     f.write("\n")
@@ -119,7 +121,7 @@ async def import_datapackage(name: str, dp: Datapackage) -> None:
                     f.write(line)
             written = True
     if to_append:
-        with open(os.path.join("world_data", "worlds", name, "progression.txt"), "a") as f:
+        with open(prog_txt, "a") as f:
             if not trailing_newline:
                 f.write("\n")
             for item in to_append:
@@ -131,7 +133,7 @@ async def import_datapackage(name: str, dp: Datapackage) -> None:
 
     if written:
         to_append = to_append | to_replace
-        await git(["add", f"worlds/{name}/progression.txt"], cwd="world_data")
+        await git(["add", f"worlds/{safe_name}/progression.txt"], cwd="world_data")
         if not to_append:
             message = f"{name}: Create progression.txt"
         elif len(to_append) < 4:
