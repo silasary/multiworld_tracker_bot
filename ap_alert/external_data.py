@@ -76,7 +76,7 @@ async def import_datapackage(name: str, dp: Datapackage) -> None:
             # written = True
 
     set(dp.items.keys())
-    to_append = set(k for k, v in dp.items.items() if v not in [ItemClassification.unknown, ItemClassification.bad_name])
+    to_append = set(k for k, v in dp.items.items() if v != ItemClassification.bad_name)
     to_append.discard("Rollback detected!")
     to_replace = set()
 
