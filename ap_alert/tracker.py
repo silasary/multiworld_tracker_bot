@@ -112,7 +112,6 @@ class APTracker(Extension):
             await ctx.send("Please use the tracker URL, not the port number", ephemeral=True)
             return
 
-
         if url.split("/")[-1].isnumeric():
             # Track slot
             if ctx.author_id not in self.trackers:
@@ -386,6 +385,7 @@ class APTracker(Extension):
                 name = name + port
 
         embed = Embed(title=name)
+        embed.set_author(tracker.game)
         last_check = format_relative_time(tracker.last_refresh) or "Never"
         embed.add_field("Last Refreshed", last_check)
         last_item = format_relative_time(tracker.last_item[1]) if tracker.last_item[0] else "N/A"
