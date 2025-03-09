@@ -31,6 +31,20 @@ async def git(args: list[str], cwd: str) -> int:
         return code
 
 
+async def git_output(args: list[str], cwd: str) -> str:
+    """Run a git command."""
+    print(f"Running git {' '.join(args)} in {cwd}")
+    if sys.platform == "win32":
+        try:
+            return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout
+        except subprocess.CalledProcessError as e:
+            return e.returncode
+    else:
+        process = await asyncio.subprocess.create_subprocess_exec("git", *args, cwd=cwd, stdout=asyncio.subprocess.PIPE)
+        output = await process.communicate()
+        return output[0].decode("utf-8")
+
+
 @Task.create(IntervalTrigger(hours=1))
 async def update_datapackage() -> None:
     """Update the datapackage."""
@@ -55,91 +69,43 @@ async def update_all(dps: dict[str, Datapackage]) -> None:
         await import_datapackage(name, dp)
 
 
-async def import_datapackage(name: str, dp: Datapackage) -> None:
+async def load_all(dps: dict[str, Datapackage]) -> None:
+    """Load all datapackages, preserving external sort order."""
+    for name, old in dps.items():
+        new = await import_datapackage(name, None)
+        for item, classification in old.items.items():
+            if item not in new.items:
+                new.set_classification(item, classification)
+        dps[name] = new
+
+
+async def import_datapackage(name: str, dp: Datapackage) -> Datapackage:
     logging.info(f"Loading datapackage {name}")
     if name is None:
         return
     if name in ["None", "null"]:
         return
 
-    DATAPACKAGES[name] = dp
     written = False
     if not os.path.exists("world_data"):
         await clone_repo()
+    from world_data.models import load_datapackage, save_datapackage
+
     safe_name = name.replace("/", "_").replace(":", "_")
-    prog_txt = os.path.join("world_data", "worlds", safe_name, "progression.txt")
-    if not os.path.exists(prog_txt):
-        logging.info(f"Datapackage {name} not found in Zoggoth's repo.")
-        os.makedirs(os.path.join("world_data", "worlds", safe_name), exist_ok=True)
-        with open(prog_txt, "w") as f:
-            f.write("")
-            # written = True
+    dp = load_datapackage(safe_name, dp)
+    DATAPACKAGES[name] = dp
 
-    set(dp.items.keys())
-    to_append = set(k for k, v in dp.items.items() if v != ItemClassification.bad_name)
-    to_append.discard("Rollback detected!")
-    to_replace = set()
-
-    trailing_newline = True
-
-    with open(prog_txt) as f:
-        for line in f:
-            if not line.strip():
-                trailing_newline = True
-                continue
-            splits = line.split(": ")
-            key = ": ".join(splits[:-1])
-            value = splits[-1].strip().lower()
-
-            to_append.discard(key)
-            if value == "unknown":
-                # logging.info(f"Zoggoth doesn't know the classification for item {key} in {name}.")
-                if key in dp.items:
-                    to_replace.add(key)
-                continue
-            elif value in classifications:
-                dp.items[key] = classifications[value]
-            else:
-                logging.error(f"Unknown classification `{value}` for item {key} in {name}.")
-            trailing_newline = line.endswith("\n")
-
-    # written = False
-    if to_replace:
-        with open(prog_txt, "r") as f:
-            lines = f.readlines()
-        with open(prog_txt, "w") as f:
-            for line in lines:
-                if not line.strip():
-                    f.write("\n")
-                    continue
-                splits = line.split(": ")
-                key = ": ".join(splits[:-1])
-                if key in to_replace:
-                    v = dp.items[key]
-                    f.write(f"{key}: {v.name}\n")
-                else:
-                    f.write(line)
-            written = True
-    if to_append:
-        with open(prog_txt, "a") as f:
-            if not trailing_newline:
-                f.write("\n")
-            for item in to_append:
-                v = dp.items[item]
-                if v == ItemClassification.bad_name:
-                    continue
-                f.write(f"{item}: {v.name}\n")
-                written = True
+    save_datapackage(name, dp)
+    output = await git_output(["diff", "--numstat"], cwd="world_data")
+    if output.strip():
+        lines_added = sum(int(x.split("\t")[0]) for x in output.splitlines())
+        written = True
 
     if written:
-        to_append = to_append | to_replace
         await git(["add", f"worlds/{safe_name}/progression.txt"], cwd="world_data")
-        if not to_append:
-            message = f"{name}: Create progression.txt"
-        elif len(to_append) < 4:
-            message = f"{name}: Add {', '.join(to_append)}"
-        else:
-            message = f"{name}: Add {len(to_append)} items"
+        message = f"{name}: Added {lines_added} items"
         await git(["commit", "-m", message], cwd="world_data")
         await git(["push", "git@github.com:silasary/world_data.git"], cwd="world_data")
         # await git(["checkout", "main"], cwd="world_data")
+
+    return dp

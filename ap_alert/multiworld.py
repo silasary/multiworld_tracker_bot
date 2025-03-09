@@ -13,6 +13,7 @@ import requests
 from bs4 import BeautifulSoup, Tag
 
 from shared.exceptions import BadAPIKeyException
+from world_data.models import Datapackage, ItemClassification
 
 from .converter import converter
 
@@ -96,15 +97,15 @@ class Hint:
         return embed
 
 
-class ItemClassification(enum.Flag):
-    unknown = 0
-    trap = 1
-    filler = 2
-    useful = 4
-    progression = 8
-    mcguffin = 16
+# class ItemClassification(enum.Flag):
+#     unknown = 0
+#     trap = 1
+#     filler = 2
+#     useful = 4
+#     progression = 8
+#     mcguffin = 16
 
-    bad_name = 256
+#     bad_name = 256
 
 
 class Filters(enum.Flag):
@@ -141,30 +142,31 @@ class NetworkItem:
         return DATAPACKAGES[self.game].items.get(self.name, ItemClassification.unknown)
 
 
-@attrs.define()
-class OldDatapackage:
-    # game: str
-    items: dict[str, OldClassification]
+# @attrs.define()
+# class Datapackage:
+#     items: dict[str, ItemClassification] = attrs.field(factory=dict)
+#     categories: dict[str, ItemClassification] = attrs.field(factory=dict)
 
+#     def icon(self, item_name: str) -> str:
+#         classification = self.items.get(item_name, ItemClassification.unknown)
+#         emoji = "❓"
+#         if classification == ItemClassification.mcguffin:
+#             emoji = "✨"
+#         if classification == ItemClassification.filler:
+#             emoji = "<:filler:1277502385459171338>"
+#         if classification == ItemClassification.useful:
+#             emoji = "<:useful:1277502389729103913>"
+#         if classification == ItemClassification.progression:
+#             emoji = "<:progression:1277502382682542143>"
+#         if classification == ItemClassification.trap:
+#             emoji = "❌"
+#         return emoji
 
-@attrs.define()
-class Datapackage:
-    items: dict[str, ItemClassification] = attrs.field(factory=dict)
-
-    def icon(self, item_name: str) -> str:
-        classification = self.items.get(item_name, ItemClassification.unknown)
-        emoji = "❓"
-        if classification == ItemClassification.mcguffin:
-            emoji = "✨"
-        if classification == ItemClassification.filler:
-            emoji = "<:filler:1277502385459171338>"
-        if classification == ItemClassification.useful:
-            emoji = "<:useful:1277502389729103913>"
-        if classification == ItemClassification.progression:
-            emoji = "<:progression:1277502382682542143>"
-        if classification == ItemClassification.trap:
-            emoji = "❌"
-        return emoji
+#     def set_classification(self, item_name: str, classification: ItemClassification) -> None:
+#         if classification == ItemClassification.unknown and self.items.get(item_name, ItemClassification.unknown) != ItemClassification.unknown:
+#             # We don't want to set an item to unknown if it's already classified
+#             return
+#         self.items[item_name] = classification
 
 
 class CheeseGame(dict):
@@ -351,7 +353,7 @@ class TrackedGame:
 
     async def refresh_metadata(self) -> None:
         logging.info(f"Refreshing metadata for {self.url}")
-        multitracker_url = '/'.join(self.url.split("/")[:-2])
+        multitracker_url = "/".join(self.url.split("/")[:-2])
         async with aiohttp.ClientSession() as session:
             async with session.get(multitracker_url) as response:
                 if response.status != 200:
@@ -365,8 +367,8 @@ class TrackedGame:
             return
         slots = process_table(soup.find(id="checks-table"))
         for slot in slots:
-            if slot['#'] == self.slot_id:
-                self.game = slot['Game']
+            if slot["#"] == self.slot_id:
+                self.game = slot["Game"]
                 # self.name = slot['Name']
                 break
 
