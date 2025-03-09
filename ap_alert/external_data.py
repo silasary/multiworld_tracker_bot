@@ -33,7 +33,7 @@ async def git(args: list[str], cwd: str) -> int:
 
 async def git_output(args: list[str], cwd: str) -> str:
     """Run a git command."""
-    print(f"Running git {' '.join(args)} in {cwd}")
+    logging.info(f"Running git {' '.join(args)} in {cwd}")
     if sys.platform == "win32":
         try:
             return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout
@@ -71,11 +71,24 @@ async def update_all(dps: dict[str, Datapackage]) -> None:
 
 async def load_all(dps: dict[str, Datapackage]) -> None:
     """Load all datapackages, preserving external sort order."""
+    await clone_repo()
     for name, old in dps.items():
         new = await import_datapackage(name, None)
+        if not new:
+            continue
         for item, classification in old.items.items():
-            if item not in new.items:
-                new.set_classification(item, classification)
+            written = False
+            if item not in new.items or new.items[item] == ItemClassification.unknown:
+                if classification == ItemClassification.bad_name:
+                    continue
+                if item == "Rollback detected!":
+                    continue
+                written = new.set_classification(item, classification) or written
+        if written:
+            from world_data.models import save_datapackage
+            save_datapackage(name, new)
+            await push(name)
+
         dps[name] = new
 
 
@@ -86,7 +99,6 @@ async def import_datapackage(name: str, dp: Datapackage) -> Datapackage:
     if name in ["None", "null"]:
         return
 
-    written = False
     if not os.path.exists("world_data"):
         await clone_repo()
     from world_data.models import load_datapackage, save_datapackage
@@ -96,16 +108,17 @@ async def import_datapackage(name: str, dp: Datapackage) -> Datapackage:
     DATAPACKAGES[name] = dp
 
     save_datapackage(name, dp)
+    await push(name)
+
+    return dp
+
+async def push(name: str) -> None:
+    safe_name = name.replace("/", "_").replace(":", "_")
     output = await git_output(["diff", "--numstat"], cwd="world_data")
     if output.strip():
         lines_added = sum(int(x.split("\t")[0]) for x in output.splitlines())
-        written = True
 
-    if written:
         await git(["add", f"worlds/{safe_name}/progression.txt"], cwd="world_data")
         message = f"{name}: Added {lines_added} items"
         await git(["commit", "-m", message], cwd="world_data")
         await git(["push", "git@github.com:silasary/world_data.git"], cwd="world_data")
-        # await git(["checkout", "main"], cwd="world_data")
-
-    return dp

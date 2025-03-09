@@ -80,7 +80,7 @@ class APTracker(Extension):
         self.refresh_all.start()
         self.refresh_all.trigger.last_call_time = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=1)
         external_data.update_datapackage.start()
-        # await zoggoth.update_datapackage()
+        await external_data.update_datapackage()
         activity = Activity(name=f"{self.tracker_count} slots across {self.user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
 
