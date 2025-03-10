@@ -65,7 +65,7 @@ async def clone_repo() -> None:
 
 async def update_all(dps: dict[str, Datapackage]) -> None:
     """Update all datapackages."""
-    for name, dp in dps.items():
+    for name, dp in dps.copy().items():
         await import_datapackage(name, dp)
 
 
@@ -86,6 +86,7 @@ async def load_all(dps: dict[str, Datapackage]) -> None:
                 written = new.set_classification(item, classification) or written
         if written:
             from world_data.models import save_datapackage
+
             save_datapackage(name, new)
             await push(name)
 
@@ -111,6 +112,7 @@ async def import_datapackage(name: str, dp: Datapackage) -> Datapackage:
     await push(name)
 
     return dp
+
 
 async def push(name: str) -> None:
     safe_name = name.replace("/", "_").replace(":", "_")
