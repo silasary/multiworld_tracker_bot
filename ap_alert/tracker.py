@@ -284,11 +284,11 @@ class APTracker(Extension):
                 if classification == ItemClassification.mcguffin:
                     emoji = "✨"
                 if classification == ItemClassification.filler:
-                    emoji = f"<:{'f' if len(new_items) > 10 else 'filler'}:1277502385459171338>"
+                    emoji = "<:filler:1277502385459171338>"
                 if classification == ItemClassification.useful:
-                    emoji = f"<:{'u' if len(new_items) > 10 else 'useful'}:1277502389729103913>"
+                    emoji = "<:useful:1277502389729103913>"
                 if classification == ItemClassification.progression:
-                    emoji = f"<:{'p' if len(new_items) > 10 else 'progression'}:1277502382682542143>"
+                    emoji = "<:progression:1277502382682542143>"
                 if classification == ItemClassification.trap:
                     emoji = "❌"
 
