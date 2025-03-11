@@ -70,27 +70,10 @@ async def update_all(dps: dict[str, Datapackage]) -> None:
 
 
 async def load_all(dps: dict[str, Datapackage]) -> None:
-    """Load all datapackages, preserving external sort order."""
+    """Load all datapackages."""
     await clone_repo()
-    for name, old in dps.items():
-        new = await import_datapackage(name, None)
-        if not new:
-            continue
-        for item, classification in old.items.items():
-            written = False
-            if item not in new.items or new.items[item] == ItemClassification.unknown:
-                if classification == ItemClassification.bad_name:
-                    continue
-                if item == "Rollback detected!":
-                    continue
-                written = new.set_classification(item, classification) or written
-        if written:
-            from world_data.models import save_datapackage
-
-            save_datapackage(name, new)
-            await push(name)
-
-        dps[name] = new
+    for name, dp in dps.items():
+        await import_datapackage(name, dp)
 
 
 async def import_datapackage(name: str, dp: Datapackage) -> Datapackage:
