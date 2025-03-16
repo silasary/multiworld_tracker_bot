@@ -285,12 +285,17 @@ class TrackedGame:
         if self.game is None:
             await self.refresh_metadata()
         logging.info(f"Refreshing {self.url}")
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.url) as response:
-                if response.status != 200:
-                    self.failures += 1
-                    return []
-                html = await response.text()
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self.url) as response:
+                    if response.status != 200:
+                        self.failures += 1
+                        return []
+                    html = await response.text()
+        except aiohttp.InvalidUrlClientError:
+            # This is a bad URL, don't try again
+            self.failures = 100
+            return []
         # html = requests.get(self.url).content
         soup = BeautifulSoup(html, features="html.parser")
         title = soup.find("title").string
