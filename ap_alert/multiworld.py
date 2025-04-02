@@ -437,10 +437,10 @@ class TrackedGame:
                 self.receiver_hints[hint.id].update = HintUpdate.found
                 if filters & HintFilters.receiver:
                     updated.append(self.receiver_hints[hint.id])
-            elif hint.classification != self.receiver_hints[hint.id].classification:
+            elif hint.classification != self.receiver_hints[hint.id].classification and not hint.found:
                 self.receiver_hints[hint.id] = hint
                 self.receiver_hints[hint.id].update = HintUpdate.classified
-                if filters & HintFilters.receiver:
+                if filters & HintFilters.receiver and hint.classification != HintClassification.unset:
                     updated.append(self.receiver_hints[hint.id])
             if len(updated) == 10:
                 return updated
