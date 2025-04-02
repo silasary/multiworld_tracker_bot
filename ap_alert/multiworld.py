@@ -24,7 +24,7 @@ else:
 
 OldClassification = enum.Enum("OldClassification", "unknown trap filler useful progression mcguffin")
 ProgressionStatus = CursedStrEnum("ProgressionStatus", "unknown bk go soft_bk unblocked")
-HintClassification = CursedStrEnum("HintClassification", "unknown critical useful trash")
+HintClassification = CursedStrEnum("HintClassification", "unset critical progression qol trash unknown")
 HintUpdate = CursedStrEnum("HintUpdate", "none new found classified useless")
 TrackerStatus = CursedStrEnum("TrackerStatus", "unknown disconnected connected ready playing goal_completed")
 CompletionStatus = CursedStrEnum("CompletionStatus", "unknown incomplete all_checks goal done released")
@@ -402,7 +402,7 @@ class TrackedGame:
             filters = HintFilters.all
         updated = []
         finder_hints = [Hint(**h, is_finder=True) for h in data if h.get("finder_game_id") == self.id]
-        receiver_hints = [Hint(**h, is_finder=False) for h in data if h.get("receiver_game_id") == self.id]
+        receiver_hints = [Hint(**h, is_finder=False) for h in data if h.get("receiver_game_id") == self.id and h.get("finder_game_id") != self.id]
         for hint in finder_hints:
             if hint.id not in self.finder_hints:
                 self.finder_hints[hint.id] = hint
@@ -416,7 +416,7 @@ class TrackedGame:
                 if not self.finder_hints[hint.id].useless:
                     if filters & HintFilters.finder:
                         updated.append(self.finder_hints[hint.id])
-            elif hint.classification != self.finder_hints[hint.id].classification:
+            elif hint.classification != self.finder_hints[hint.id].classification and not hint.found:
                 self.finder_hints[hint.id] = hint
                 self.finder_hints[hint.id].update = HintUpdate.classified
                 if filters & HintFilters.finder:
