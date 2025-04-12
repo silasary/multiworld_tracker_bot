@@ -5,7 +5,11 @@ from typing import Any
 
 from .exceptions import InvalidArgumentException
 
-DEFAULTS = {"token": "", "owners": [154363842451734528, 222352614832996354]}
+DEFAULTS = {
+    "token": "",
+    "owners": [154363842451734528, 222352614832996354],
+    "sentry_dsn": "https://7aadf0c15f880e90e01c4dba496f152d@o233010.ingest.us.sentry.io/4507219660832768",
+    }
 
 
 def get(key: str) -> Any:
