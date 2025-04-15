@@ -28,6 +28,7 @@ from interactions.ext.paginators import Paginator
 from interactions.models.discord import Button, ButtonStyle, User, Embed, Message
 from interactions.models.internal.application_commands import OptionType, integration_types, slash_command, slash_option
 from interactions.models.internal.tasks import IntervalTrigger, Task
+from requests.structures import CaseInsensitiveDict
 
 from ap_alert.converter import converter
 from shared.exceptions import BadAPIKeyException
@@ -50,7 +51,7 @@ class APTracker(Extension):
     def __init__(self, bot: Client) -> None:
         self.bot: Client = bot
         self.trackers: dict[int, list[TrackedGame]] = {}
-        self.cheese: dict[str, Multiworld] = {}
+        self.cheese: dict[str, Multiworld] = CaseInsensitiveDict()
         self.datapackages: dict[str, Datapackage] = {}
         self.players: dict[int, Player] = {}
         self.stats = {}
@@ -222,10 +223,11 @@ class APTracker(Extension):
             useful = Button(style=ButtonStyle.GREEN, label="Useful", emoji="<:useful:1277502389729103913>")
             progression = Button(style=ButtonStyle.BLUE, label="Progression", emoji="<:progression:1277502382682542143>")
             mcguffin = Button(style=ButtonStyle.BLUE, label="McGuffin", emoji="✨")
+            skip = Button(style=ButtonStyle.GREY, label="Skip", emoji="⏭️")
             msg = await ctx.send(
                 f"[{tracker.game}] What kind of item is {item}?",
                 ephemeral=ephemeral,
-                components=[[trap, filler, useful, progression, mcguffin]],
+                components=spread_to_rows(trap, filler, useful, progression, mcguffin, skip),
             )
             try:
                 chosen = await self.bot.wait_for_component(msg, timeout=3600)
@@ -241,11 +243,13 @@ class APTracker(Extension):
                     classification = ItemClassification.trap
                 elif chosen.ctx.custom_id == mcguffin.custom_id:
                     classification = ItemClassification.mcguffin
+                elif chosen.ctx.custom_id == skip.custom_id:
+                    classification == ItemClassification.unknown
                 else:
                     print(f"wat: {chosen.ctx.custom_id}")
                 if tracker.game not in self.datapackages:
                     self.datapackages[tracker.game] = Datapackage(items={})
-                self.datapackages[tracker.game].items[item] = classification
+                self.datapackages[tracker.game].set_classification(item, classification)
                 await chosen.ctx.send(f"✅{item} is {classification}", ephemeral=True)
                 n += 1
                 if n > 3 and isinstance(ctx, InteractionContext):
@@ -848,7 +852,7 @@ class APTracker(Extension):
         try:
             if os.path.exists("gamedata.json"):
                 with open("gamedata.json") as f:
-                    self.datapackages = converter.structure(json.loads(f.read()), dict[str, Datapackage])
+                    self.datapackages.update(converter.structure(json.loads(f.read()), dict[str, Datapackage]))
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
