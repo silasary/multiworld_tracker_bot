@@ -6,6 +6,7 @@ import os
 import re
 import itertools
 
+import aiohttp
 import requests
 import sentry_sdk
 from interactions import (
@@ -642,13 +643,15 @@ class APTracker(Extension):
         if multiworld is None:
             if ap_url is None:
                 ap_url = f"https://archipelago.gg/tracker/{room}"
-            response = requests.post(
-                "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
-                json={"url": ap_url},
-            )
-            if response.status_code in [400, 403, 404]:
-                return room, None
-            ch_id = response.json().get("tracker_id")
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
+                    json={"url": ap_url},
+                ) as response:
+                    if response.status in [400, 403, 404]:
+                        return room, None
+                    ch_id = response.json().get("tracker_id")
+
             multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
             if not multiworld.title:
                 multiworld.title = room
