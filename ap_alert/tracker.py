@@ -699,6 +699,11 @@ class APTracker(Extension):
                 urls = set()
                 ids = set()
                 for tracker in trackers:
+                    try:
+                        tracker.tracker_id
+                    except IndexError:
+                        tracker.failures = 99
+
                     if tracker.failures >= 10:
                         self.remove_tracker(player, tracker)
                         await player.send(f"Tracker {tracker.url} has been removed due to errors")
