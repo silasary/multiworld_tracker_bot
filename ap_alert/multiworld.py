@@ -9,7 +9,6 @@ import interactions
 from collections import defaultdict
 
 import attrs
-import requests
 from bs4 import BeautifulSoup, Tag
 
 from shared.exceptions import BadAPIKeyException
@@ -494,10 +493,18 @@ class Multiworld:
         """
         return max(g.last_activity for g in self.games.values())
 
-    def put(self, game: CheeseGame) -> None:
+    async def put(self, game: CheeseGame) -> None:
         # PUT https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/MMV8lMURTE6KoOLAPSs2Dw/game/63591
         game = converter.unstructure(game)  # convert datetime to isoformat
-        requests.put(f"{self.url}/game/{game['id']}", json=game)
+        async with aiohttp.ClientSession() as session:
+            async with session.put(f"{self.url}/game/{game['id']}", json=game) as response:
+                if response.status != 200:
+                    raise aiohttp.ClientResponseError(
+                        status=response.status,
+                        message=f"Failed to update game {game['id']}",
+                        request_info=response.request_info,
+                        history=response.history,
+                    )
 
     @property
     def goaled(self) -> bool:

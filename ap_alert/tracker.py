@@ -451,7 +451,7 @@ class APTracker(Extension):
         game = multiworld.games[tracker.slot_id]
         game["progression_status"] = ProgressionStatus.unblocked
         # game['last_checked'] = datetime.datetime.now(tz=datetime.timezone.utc)
-        multiworld.put(game)
+        await multiworld.put(game)
         tracker.progression_status = ProgressionStatus.unblocked
 
         await ctx.send("Progression status updated", ephemeral=True)
@@ -468,7 +468,7 @@ class APTracker(Extension):
         game = multiworld.games[tracker.slot_id]
         # game["progression_status"] = ProgressionStatus.bk
         game["last_checked"] = datetime.datetime.now(tz=datetime.timezone.utc)
-        multiworld.put(game)
+        await multiworld.put(game)
 
         await ctx.send("Progression status updated", ephemeral=True)
 
@@ -709,7 +709,11 @@ class APTracker(Extension):
                     urls.add(tracker.url)
                     if tracker.id:
                         ids.add(tracker.id)
-                    multiworld, _found = await self.sync_cheese(player, tracker.tracker_id)
+                    try:
+                        multiworld, _found = await self.sync_cheese(player, tracker.tracker_id)
+                    except IndexError:
+                        tracker.failures += 1
+                        continue
                     if multiworld is None:
                         tracker.failures += 1
                         if tracker.failures >= 3:
