@@ -245,7 +245,7 @@ class APTracker(Extension):
                 elif chosen.ctx.custom_id == mcguffin.custom_id:
                     classification = ItemClassification.mcguffin
                 elif chosen.ctx.custom_id == skip.custom_id:
-                    classification == ItemClassification.unknown
+                    classification = ItemClassification.unknown
                 else:
                     print(f"wat: {chosen.ctx.custom_id}")
                 if tracker.game not in self.datapackages:
@@ -733,6 +733,12 @@ class APTracker(Extension):
                             await player.send(f"Tracker {tracker.url} has been removed due to errors")
                         self.save()
                         continue
+
+                    if tracker.filters == Filters.unset and player_settings.default_filters != Filters.unset:
+                        tracker.filters = player_settings.default_filters
+                    if tracker.hint_filters == HintFilters.unset and player_settings.default_hint_filters != HintFilters.unset:
+                        tracker.hint_filters = player_settings.default_hint_filters
+
                     should_check = (
                         tracker.last_refresh is None
                         or tracker.last_refresh.tzinfo is None

@@ -211,6 +211,8 @@ class Player:
     name: str = None
 
     cheese_api_key: str | None = None
+    default_filters: Filters = Filters.unset
+    default_hint_filters: HintFilters = HintFilters.unset
 
     @property
     def mention(self) -> str:
