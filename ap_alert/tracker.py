@@ -7,7 +7,6 @@ import re
 import itertools
 
 import aiohttp
-import requests
 import sentry_sdk
 from interactions import (
     ActionRow,
@@ -650,7 +649,7 @@ class APTracker(Extension):
                 ) as response:
                     if response.status in [400, 403, 404]:
                         return room, None
-                    ch_id = response.json().get("tracker_id")
+                    ch_id = (await response.json()).get("tracker_id")
 
             multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
             if not multiworld.title:
