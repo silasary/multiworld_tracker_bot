@@ -43,8 +43,8 @@ regex_remove = re.compile(r"remove:(\d+)")
 regex_bk = re.compile(r"bk:(\d+)")
 regex_inv = re.compile(r"inv:(\d+)")
 regex_settings = re.compile(r"settings:(\d+)")
-regex_filter = re.compile(r"filter:(\d+):(\d+)")
-regex_hint_filter = re.compile(r"hint_filter:(\d+):(\d+)")
+regex_filter = re.compile(r"filter:(\d+|default):(\d+)")
+regex_hint_filter = re.compile(r"hint_filter:(\d+|default):(\d+)")
 
 
 class APTracker(Extension):
@@ -56,6 +56,13 @@ class APTracker(Extension):
         self.players: dict[int, Player] = {}
         self.stats = {}
         self.load()
+
+    def get_player_settings(self, id: int) -> Player:
+        player = self.players.get(id)
+        if player is None:
+            player = Player(id)
+            self.players[id] = player
+        return player
 
     @property
     def user_count(self):
@@ -192,10 +199,7 @@ class APTracker(Extension):
     @slash_option("api_key", "Your Cheese Tracker API key", OptionType.STRING, required=True)
     async def ap_authenticate(self, ctx: SlashContext, api_key: str) -> None:
         """Authenticate with Cheese Tracker. This allows the bot to automatically track your claimed games."""
-        player = self.players.get(ctx.author_id)
-        if player is None:
-            player = Player(ctx.author_id)
-            self.players[ctx.author_id] = player
+        player = self.get_player_settings(ctx.author_id)
         player.cheese_api_key = api_key.strip()
         await ctx.send("API key saved", ephemeral=True)
         if player.id not in self.trackers:
@@ -534,6 +538,13 @@ class APTracker(Extension):
     async def filter(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_filter.match(ctx.custom_id)
+        if m.group(1) == "default":
+            player_settings = self.get_player_settings(ctx.author_id)
+            player_settings.default_filters = Filters(int(m.group(2)))
+            await ctx.send("Default filter updated", ephemeral=True)
+            self.save()
+            return
+
         tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
         if tracker is None:
             return
@@ -545,12 +556,60 @@ class APTracker(Extension):
     async def hint_filter(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_hint_filter.match(ctx.custom_id)
+        if m.group(1) == "default":
+            player_settings = self.get_player_settings(ctx.author_id)
+            player_settings.default_hint_filters = HintFilters(int(m.group(2)))
+            await ctx.send("Default hint filter updated", ephemeral=True)
+            self.save()
+            return
+
         tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
         if tracker is None:
             return
         tracker.hint_filters = HintFilters(int(m.group(2)))
         await ctx.send("Hint filter updated", ephemeral=True)
         self.save()
+
+    @ap.subcommand("settings")
+    async def ap_settings(self, ctx: SlashContext) -> None:
+        """Configure your Archipelago settings."""
+        player_settings = self.get_player_settings(ctx.author_id)
+        embed = Embed(title="Settings")
+        components = []
+
+        def filter_button(name: str, value: Filters):
+            colour = ButtonStyle.GREY
+            if value == player_settings.default_filters:
+                colour = ButtonStyle.GREEN
+            return Button(style=colour, label=name, custom_id=f"filter:default:{value.value}")
+
+        def hint_filter_button(name: str, value: HintFilters):
+            colour = ButtonStyle.GREY
+            if value == player_settings.default_hint_filters:
+                colour = ButtonStyle.GREEN
+            return Button(style=colour, label=name, custom_id=f"hint_filter:default:{value.value}")
+
+        row = ActionRow()
+        components.append(row)
+        row.add_component(filter_button("Filter: Nothing", Filters.none))
+        row.add_component(filter_button("Filter: Everything", Filters.everything))
+        row.add_component(filter_button("Filter: Useful+", Filters.useful_plus))
+        row.add_component(filter_button("Filter: Progression", Filters.progression))
+        row.add_component(filter_button("Filter: Prog+McGuffins", Filters.progression_plus))
+        ### Second row
+        row = ActionRow()
+        components.append(row)
+        row.add_component(hint_filter_button("Hint Filter: Nothing", HintFilters.none))
+        row.add_component(hint_filter_button("Hint Filter: Everything", HintFilters.all))
+        row.add_component(hint_filter_button("Hint Filter: Received", HintFilters.finder))
+        row.add_component(hint_filter_button("Hint Filter: Sent", HintFilters.receiver))
+        ### Third row
+        row = ActionRow()
+        components.append(row)
+        row.add_component(filter_button("Filter: No Default", Filters.unset))
+        row.add_component(hint_filter_button("Hint Filter: No Default", HintFilters.unset))
+
+        await ctx.send(embed=embed, components=components)
 
     async def sync_cheese(self, player: User, room: str | Multiworld) -> tuple[Multiworld, bool]:
         room, multiworld = await self.url_to_multiworld(room)
@@ -678,10 +737,7 @@ class APTracker(Extension):
                 if not player:
                     continue
 
-                player_settings = self.players.get(player.id)
-                if player_settings is None:
-                    player_settings = Player(player.id)
-                    self.players[player.id] = player_settings
+                player_settings = self.get_player_settings(player.id)
                 player_settings.update(player)
 
                 if player_settings.cheese_api_key:
@@ -698,11 +754,6 @@ class APTracker(Extension):
                 urls = set()
                 ids = set()
                 for tracker in trackers:
-                    try:
-                        tracker.tracker_id
-                    except IndexError:
-                        tracker.failures = 99
-
                     if tracker.failures >= 10:
                         self.remove_tracker(player, tracker)
                         await player.send(f"Tracker {tracker.url} has been removed due to errors")
