@@ -101,9 +101,16 @@ async def push(name: str) -> None:
     safe_name = name.replace("/", "_").replace(":", "_")
     output = await git_output(["diff", "--numstat"], cwd="world_data")
     if output.strip():
-        lines_added = sum(int(x.split("\t")[0]) for x in output.splitlines())
+        raw_lines_added = sum(int(x.split("\t")[0]) for x in output.splitlines())
+        raw_lines_removed = sum(int(x.split("\t")[1]) for x in output.splitlines())
+        lines_added = raw_lines_added - raw_lines_removed
+        lines_updated = raw_lines_added - lines_added
 
         await git(["add", f"worlds/{safe_name}/progression.txt"], cwd="world_data")
-        message = f"{name}: Added {lines_added} items"
+        message = f"{name}:"
+        if lines_added > 0:
+            message += f" {lines_added} items added"
+        if lines_updated > 0:
+            message += f" {lines_updated} items updated"
         await git(["commit", "-m", message], cwd="world_data")
         await git(["push", "git@github.com:silasary/world_data.git"], cwd="world_data")
