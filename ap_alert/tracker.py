@@ -222,6 +222,10 @@ class APTracker(Extension):
         unclassified = [i.name for i in new_items if i.classification in [ItemClassification.unknown, ItemClassification.bad_name]]
         n = 0
         for item in unclassified:
+            if TRACKERS.get(tracker.game) and (classification := TRACKERS[tracker.game].classify(tracker, item)):
+                if self.datapackages[tracker.game].set_classification(item, classification):
+                    continue
+
             trap = Button(style=ButtonStyle.RED, label="Trap", emoji="❌")
             filler = Button(style=ButtonStyle.GREY, label="Filler", emoji="<:filler:1277502385459171338>")
             useful = Button(style=ButtonStyle.GREEN, label="Useful", emoji="<:useful:1277502389729103913>")
