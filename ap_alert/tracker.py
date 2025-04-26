@@ -528,6 +528,7 @@ class APTracker(Extension):
         components.append(filter_button("Filter: Nothing", Filters.none))
         components.append(filter_button("Filter: Everything", Filters.everything))
         components.append(filter_button("Filter: Useful+", Filters.useful_plus))
+        components.append(filter_button("Filter: Useful+Progression", Filters.useful_plus_progression))
         components.append(filter_button("Filter: Progression", Filters.progression))
         components.append(filter_button("Filter: Prog+McGuffins", Filters.progression_plus))
         ### Second row
@@ -598,6 +599,7 @@ class APTracker(Extension):
         row.add_component(filter_button("Filter: Nothing", Filters.none))
         row.add_component(filter_button("Filter: Everything", Filters.everything))
         row.add_component(filter_button("Filter: Useful+", Filters.useful_plus))
+        row.add_component(filter_button("Filter: Useful+Progression", Filters.useful_plus_progression))
         row.add_component(filter_button("Filter: Progression", Filters.progression))
         row.add_component(filter_button("Filter: Prog+McGuffins", Filters.progression_plus))
         ### Second row
