@@ -534,13 +534,15 @@ class APTracker(Extension):
         row = ActionRow()
         components.append(row)
         row.add_component(filter_button("Filter: Useful+Progression", Filters.useful_plus_progression))
-        components.append(filter_button("Filter: Progression", Filters.progression))
-        components.append(filter_button("Filter: Prog+McGuffins", Filters.progression_plus))
+        row.add_component(filter_button("Filter: Progression", Filters.progression))
+        row.add_component(filter_button("Filter: Prog+McGuffins", Filters.progression_plus))
         ### Third row
-        components.append(hint_filter_button("Hint Filter: Nothing", HintFilters.none))
-        components.append(hint_filter_button("Hint Filter: Everything", HintFilters.all))
-        components.append(hint_filter_button("Hint Filter: Received", HintFilters.finder))
-        components.append(hint_filter_button("Hint Filter: Sent", HintFilters.receiver))
+        row = ActionRow()
+        components.append(row)
+        row.add_component(hint_filter_button("Hint Filter: Nothing", HintFilters.none))
+        row.add_component(hint_filter_button("Hint Filter: Everything", HintFilters.all))
+        row.add_component(hint_filter_button("Hint Filter: Received", HintFilters.finder))
+        row.add_component(hint_filter_button("Hint Filter: Sent", HintFilters.receiver))
 
         await ctx.send(embed=embed, components=spread_to_rows(*components))
 
