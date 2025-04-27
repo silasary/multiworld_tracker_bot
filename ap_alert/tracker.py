@@ -525,13 +525,18 @@ class APTracker(Extension):
                 colour = ButtonStyle.GREEN
             return Button(style=colour, label=name, custom_id=f"hint_filter:{tracker.id}:{value.value}")
 
-        components.append(filter_button("Filter: Nothing", Filters.none))
-        components.append(filter_button("Filter: Everything", Filters.everything))
-        components.append(filter_button("Filter: Useful+", Filters.useful_plus))
-        components.append(filter_button("Filter: Useful+Progression", Filters.useful_plus_progression))
+        row = ActionRow()
+        components.append(row)
+        row.add_component(filter_button("Filter: Nothing", Filters.none))
+        row.add_component(filter_button("Filter: Everything", Filters.everything))
+        row.add_component(filter_button("Filter: Useful+", Filters.useful_plus))
+        ### Second Row
+        row = ActionRow()
+        components.append(row)
+        row.add_component(filter_button("Filter: Useful+Progression", Filters.useful_plus_progression))
         components.append(filter_button("Filter: Progression", Filters.progression))
         components.append(filter_button("Filter: Prog+McGuffins", Filters.progression_plus))
-        ### Second row
+        ### Third row
         components.append(hint_filter_button("Hint Filter: Nothing", HintFilters.none))
         components.append(hint_filter_button("Hint Filter: Everything", HintFilters.all))
         components.append(hint_filter_button("Hint Filter: Received", HintFilters.finder))
@@ -600,16 +605,19 @@ class APTracker(Extension):
         row.add_component(filter_button("Filter: Everything", Filters.everything))
         row.add_component(filter_button("Filter: Useful+", Filters.useful_plus))
         row.add_component(filter_button("Filter: Useful+Progression", Filters.useful_plus_progression))
+        ### Second Row
+        row = ActionRow()
+        components.append(row)
         row.add_component(filter_button("Filter: Progression", Filters.progression))
         row.add_component(filter_button("Filter: Prog+McGuffins", Filters.progression_plus))
-        ### Second row
+        ### Third row
         row = ActionRow()
         components.append(row)
         row.add_component(hint_filter_button("Hint Filter: Nothing", HintFilters.none))
         row.add_component(hint_filter_button("Hint Filter: Everything", HintFilters.all))
         row.add_component(hint_filter_button("Hint Filter: Received", HintFilters.finder))
         row.add_component(hint_filter_button("Hint Filter: Sent", HintFilters.receiver))
-        ### Third row
+        ### Fourth row
         row = ActionRow()
         components.append(row)
         row.add_component(filter_button("Filter: No Default", Filters.unset))
