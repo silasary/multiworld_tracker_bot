@@ -544,7 +544,7 @@ class APTracker(Extension):
         row.add_component(hint_filter_button("Hint Filter: Received", HintFilters.finder))
         row.add_component(hint_filter_button("Hint Filter: Sent", HintFilters.receiver))
 
-        await ctx.send(embed=embed, components=spread_to_rows(*components))
+        await ctx.send(embed=embed, components=components)
 
     @component_callback(regex_filter)
     async def filter(self, ctx: ComponentContext) -> None:
