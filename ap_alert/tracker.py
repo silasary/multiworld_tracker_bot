@@ -25,7 +25,7 @@ from interactions import (
 )
 from interactions.client.errors import Forbidden, NotFound
 from interactions.ext.paginators import Paginator
-from interactions.models.discord import Button, ButtonStyle, User, Embed, Message
+from interactions.models.discord import Button, ButtonStyle, User, Embed, Message, ContainerComponent, TextDisplayComponent
 from interactions.models.internal.application_commands import OptionType, integration_types, slash_command, slash_option
 from interactions.models.internal.tasks import IntervalTrigger, Task
 from requests.structures import CaseInsensitiveDict
@@ -509,10 +509,6 @@ class APTracker(Extension):
         if not name.endswith(port):
             name = name + port
 
-        embed = Embed(title=name)
-        embed.add_field("Current Notification Filter", tracker.filters.name)
-        components = []
-
         def filter_button(name: str, value: Filters):
             colour = ButtonStyle.GREY
             if value == tracker.filters:
@@ -525,26 +521,33 @@ class APTracker(Extension):
                 colour = ButtonStyle.GREEN
             return Button(style=colour, label=name, custom_id=f"hint_filter:{tracker.id}:{value.value}")
 
-        row = ActionRow()
-        components.append(row)
-        row.add_component(filter_button("Filter: Nothing", Filters.none))
-        row.add_component(filter_button("Filter: Everything", Filters.everything))
-        row.add_component(filter_button("Filter: Useful+", Filters.useful_plus))
-        ### Second Row
-        row = ActionRow()
-        components.append(row)
-        row.add_component(filter_button("Filter: Useful+Progression", Filters.useful_plus_progression))
-        row.add_component(filter_button("Filter: Progression", Filters.progression))
-        row.add_component(filter_button("Filter: Prog+McGuffins", Filters.progression_plus))
-        ### Third row
-        row = ActionRow()
-        components.append(row)
-        row.add_component(hint_filter_button("Hint Filter: Nothing", HintFilters.none))
-        row.add_component(hint_filter_button("Hint Filter: Everything", HintFilters.all))
-        row.add_component(hint_filter_button("Hint Filter: Received", HintFilters.finder))
-        row.add_component(hint_filter_button("Hint Filter: Sent", HintFilters.receiver))
+        components = [
+            TextDisplayComponent(f"# {name}"),
+            ContainerComponent(
+                TextDisplayComponent("## Item Filters"),
+                ActionRow(
+                    filter_button("Filter: Nothing", Filters.none),
+                    filter_button("Filter: Everything", Filters.everything),
+                    filter_button("Filter: Useful+", Filters.useful_plus),
+                ),
+                ActionRow(
+                    filter_button("Filter: Useful+Progression", Filters.useful_plus_progression),
+                    filter_button("Filter: Progression", Filters.progression),
+                    filter_button("Filter: Prog+McGuffins", Filters.progression_plus),
+                ),
+            ),
+            ContainerComponent(
+                TextDisplayComponent("## Hint Filters"),
+                ActionRow(
+                    hint_filter_button("Hint Filter: Nothing", HintFilters.none),
+                    hint_filter_button("Hint Filter: Everything", HintFilters.all),
+                    hint_filter_button("Hint Filter: Received", HintFilters.finder),
+                    hint_filter_button("Hint Filter: Sent", HintFilters.receiver),
+                ),
+            ),
+        ]
 
-        await ctx.send(embed=embed, components=components)
+        await ctx.send(components=components, ephemeral=True)
 
     @component_callback(regex_filter)
     async def filter(self, ctx: ComponentContext) -> None:
@@ -586,8 +589,6 @@ class APTracker(Extension):
     async def ap_settings(self, ctx: SlashContext) -> None:
         """Configure your Archipelago settings."""
         player_settings = self.get_player_settings(ctx.author_id)
-        embed = Embed(title="Settings")
-        components = []
 
         def filter_button(name: str, value: Filters):
             colour = ButtonStyle.GREY
@@ -601,31 +602,34 @@ class APTracker(Extension):
                 colour = ButtonStyle.GREEN
             return Button(style=colour, label=name, custom_id=f"hint_filter:default:{value.value}")
 
-        row = ActionRow()
-        components.append(row)
-        row.add_component(filter_button("Filter: Nothing", Filters.none))
-        row.add_component(filter_button("Filter: Everything", Filters.everything))
-        row.add_component(filter_button("Filter: Useful+", Filters.useful_plus))
-        row.add_component(filter_button("Filter: Useful+Progression", Filters.useful_plus_progression))
-        ### Second Row
-        row = ActionRow()
-        components.append(row)
-        row.add_component(filter_button("Filter: Progression", Filters.progression))
-        row.add_component(filter_button("Filter: Prog+McGuffins", Filters.progression_plus))
-        ### Third row
-        row = ActionRow()
-        components.append(row)
-        row.add_component(hint_filter_button("Hint Filter: Nothing", HintFilters.none))
-        row.add_component(hint_filter_button("Hint Filter: Everything", HintFilters.all))
-        row.add_component(hint_filter_button("Hint Filter: Received", HintFilters.finder))
-        row.add_component(hint_filter_button("Hint Filter: Sent", HintFilters.receiver))
-        ### Fourth row
-        row = ActionRow()
-        components.append(row)
-        row.add_component(filter_button("Filter: No Default", Filters.unset))
-        row.add_component(hint_filter_button("Hint Filter: No Default", HintFilters.unset))
-
-        await ctx.send(embed=embed, components=components)
+        components = [
+            TextDisplayComponent("# Player Settings"),
+            ContainerComponent(
+                TextDisplayComponent("## Item Filters"),
+                ActionRow(
+                    filter_button("Filter: Nothing", Filters.none),
+                    filter_button("Filter: Everything", Filters.everything),
+                    filter_button("Filter: Useful+", Filters.useful_plus),
+                ),
+                ActionRow(
+                    filter_button("Filter: Useful+Progression", Filters.useful_plus_progression),
+                    filter_button("Filter: Progression", Filters.progression),
+                    filter_button("Filter: Prog+McGuffins", Filters.progression_plus),
+                    filter_button("Filter: No Default", Filters.unset),
+                ),
+            ),
+            ContainerComponent(
+                TextDisplayComponent("## Hint Filters"),
+                ActionRow(
+                    hint_filter_button("Hint Filter: Nothing", HintFilters.none),
+                    hint_filter_button("Hint Filter: Everything", HintFilters.all),
+                    hint_filter_button("Hint Filter: Received", HintFilters.finder),
+                    hint_filter_button("Hint Filter: Sent", HintFilters.receiver),
+                    hint_filter_button("Hint Filter: No Default", HintFilters.unset),
+                ),
+            ),
+        ]
+        await ctx.send(components=components, ephemeral=True)
 
     async def sync_cheese(self, player: User, room: str | Multiworld) -> tuple[Multiworld, bool]:
         room, multiworld = await self.url_to_multiworld(room)

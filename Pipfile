@@ -9,7 +9,7 @@ python_version = "3.12"
 [packages]
 beautifulsoup4 = ">=4.13.3"
 cattrs = ">=24.1.2"
-"interactions.py" = {extras = ["speedup"], version = ">=5.14.0"}
+"interactions.py" = {extras = ["speedup"], version = ">=5.15.0rc1", pre = true}
 "jurigged" = ">=0.6.0"
 pyyaml = ">=6.0.2"
 pymongo = ">=4.11.2"
