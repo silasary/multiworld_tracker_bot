@@ -40,6 +40,7 @@ from .worlds import TRACKERS
 regex_dash = re.compile(r"dash:(\d+)")
 regex_unblock = re.compile(r"unblock:(\d+)")
 regex_remove = re.compile(r"remove:(\d+)")
+regex_disable = re.compile(r"disable:(\d+)")
 regex_bk = re.compile(r"bk:(\d+)")
 regex_inv = re.compile(r"inv:(\d+)")
 regex_settings = re.compile(r"settings:(\d+)")
@@ -63,6 +64,9 @@ class APTracker(Extension):
             player = Player(id)
             self.players[id] = player
         return player
+
+    def get_trackers(self, id: int) -> list[TrackedGame]:
+        return self.trackers.setdefault(id, [])
 
     @property
     def user_count(self):
@@ -122,16 +126,14 @@ class APTracker(Extension):
 
         if url.split("/")[-1].isnumeric():
             # Track slot
-            if ctx.author_id not in self.trackers:
-                self.trackers[ctx.author_id] = []
-
-            for t in self.trackers[ctx.author_id]:
+            for t in self.get_trackers(ctx.author_id):
                 if t.url == url:
                     tracker = t
+                    tracker.disabled = False
                     break
             else:
                 tracker = TrackedGame(url)
-                self.trackers[ctx.author_id].append(tracker)
+                self.get_trackers(ctx.author_id).append(tracker)
                 self.save()
 
             room, multiworld = await self.url_to_multiworld("/".join(url.split("/")[:-2]))
@@ -167,14 +169,14 @@ class APTracker(Extension):
 
     @ap.subcommand("refresh")
     async def ap_refresh(self, ctx: SlashContext) -> None:
-        if ctx.author_id not in self.trackers:
+        if not self.get_trackers(ctx.author_id):
             await ctx.send(f"Track a game with {self.ap_track.mention()} first", ephemeral=True)
             return
 
         ephemeral = await defer_ephemeral_if_guild(ctx)
 
         games = {}
-        for tracker in self.trackers[ctx.author_id].copy():
+        for tracker in self.get_trackers(ctx.author_id).copy():
             new_items = await tracker.refresh()
             if new_items:
                 games[tracker] = new_items
@@ -202,8 +204,6 @@ class APTracker(Extension):
         player = self.get_player_settings(ctx.author_id)
         player.cheese_api_key = api_key.strip()
         await ctx.send("API key saved", ephemeral=True)
-        if player.id not in self.trackers:
-            self.trackers[player.id] = []
         self.save()
         try:
             cheese_dash = await player.get_trackers()
@@ -350,17 +350,19 @@ class APTracker(Extension):
     @ap.subcommand("dashboard")
     async def ap_dashboard(self, ctx: SlashContext) -> None:
         await ctx.defer(ephemeral=True)
-        if ctx.author_id not in self.trackers:
+        if not self.get_trackers(ctx.author_id):
             await ctx.send(f"Track a game with {self.ap_track.mention()} first", ephemeral=True)
             return
 
-        trackers = self.trackers[ctx.author_id]
+        trackers = self.get_trackers(ctx.author_id)
         if not trackers:
             await ctx.send("No games tracked", ephemeral=True)
             return
 
         buttons: list[Button] = []
         for tracker in trackers:
+            if tracker.disabled:
+                continue
             if tracker.name is None:
                 tracker.name = f"{tracker.tracker_id} #{tracker.slot_id}"
             name = tracker.name.replace("*", "")
@@ -384,7 +386,7 @@ class APTracker(Extension):
     async def dashboard_embed(self, ctx: ComponentContext) -> Embed:
         await ctx.defer(ephemeral=True)
         m = regex_dash.match(ctx.custom_id)
-        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
         if tracker is None:
             return Embed(title="Game not found")
 
@@ -440,6 +442,8 @@ class APTracker(Extension):
 
         if not is_owner or only_game:
             components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji="🗑️", custom_id=f"remove:{tracker.id}"))
+        else:
+            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji="🗑️", custom_id=f"disable:{tracker.id}"))
         embeds = [embed]
         if TRACKERS.get(tracker.game) and (dash := await TRACKERS[tracker.game].build_dashboard(tracker)):
             embeds.append(dash)
@@ -449,10 +453,21 @@ class APTracker(Extension):
     async def remove(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_remove.match(ctx.custom_id)
-        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
         if tracker is None:
             return
-        self.trackers[ctx.author_id].remove(tracker)
+        self.get_trackers(ctx.author_id).remove(tracker)
+        await ctx.send("Tracker removed", ephemeral=True)
+        self.save()
+
+    @component_callback(regex_disable)
+    async def disable(self, ctx: ComponentContext) -> None:
+        await ctx.defer(ephemeral=True)
+        m = regex_disable.match(ctx.custom_id)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
+        if tracker is None:
+            return
+        tracker.disabled = True
         await ctx.send("Tracker removed", ephemeral=True)
         self.save()
 
@@ -460,7 +475,7 @@ class APTracker(Extension):
     async def unblock(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_unblock.match(ctx.custom_id)
-        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
         if tracker is None:
             return
         multiworld = self.cheese[tracker.tracker_id]
@@ -477,7 +492,7 @@ class APTracker(Extension):
     async def still_bk(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_bk.match(ctx.custom_id)
-        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
         if tracker is None:
             return
         multiworld = self.cheese[tracker.tracker_id]
@@ -493,7 +508,7 @@ class APTracker(Extension):
     async def inventory(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_inv.match(ctx.custom_id)
-        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
         if tracker is None:
             return
         if not tracker.all_items:
@@ -504,7 +519,7 @@ class APTracker(Extension):
     async def settings(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True, edit_origin=False)
         m = regex_settings.match(ctx.custom_id)
-        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
         if tracker is None:
             return
         multiworld = self.cheese[tracker.tracker_id]
@@ -565,7 +580,7 @@ class APTracker(Extension):
             self.save()
             return
 
-        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
         if tracker is None:
             return
         tracker.filters = Filters(int(m.group(2)))
@@ -583,7 +598,7 @@ class APTracker(Extension):
             self.save()
             return
 
-        tracker = next((t for t in self.trackers[ctx.author_id] if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
         if tracker is None:
             return
         tracker.hint_filters = HintFilters(int(m.group(2)))
@@ -651,7 +666,7 @@ class APTracker(Extension):
         for game in multiworld.games.values():
             game["url"] = f'https://archipelago.gg/tracker/{room}/0/{game["position"]}'
 
-            for t in self.trackers.get(player.id, []):
+            for t in self.get_trackers(player.id):
                 if t.url == game["url"]:
                     tracker = t
                     break
@@ -662,9 +677,6 @@ class APTracker(Extension):
                 tracker = None
 
             if game.get("effective_discord_username") == player.username:
-                if player.id not in self.trackers:
-                    self.trackers[player.id] = []
-
                 if tracker is None:
                     is_game_done = game["checks_done"] == game["checks_total"] or game.completion_status in [CompletionStatus.done, CompletionStatus.released]
                     # If either condition is true, we don't want to autotrack track this game.
@@ -672,7 +684,7 @@ class APTracker(Extension):
                         continue
 
                     tracker = TrackedGame(game["url"])
-                    self.trackers[player.id].append(tracker)
+                    self.get_trackers(player.id).append(tracker)
                     self.save()
                     tracker.game = game["game"]
                     await self.check_for_dp(tracker)
@@ -741,12 +753,12 @@ class APTracker(Extension):
         return room, multiworld
 
     def remove_tracker(self, player, tracker: str | TrackedGame) -> None:
-        for t in self.trackers[player.id].copy():
+        for t in self.get_trackers(player.id).copy():
             if isinstance(tracker, str) and t.url == tracker:
-                self.trackers[player.id].remove(t)
+                self.get_trackers(player.id).remove(t)
                 return
             elif isinstance(tracker, TrackedGame) and t == tracker:
-                self.trackers[player.id].remove(t)
+                self.get_trackers(player.id).remove(t)
                 return
 
     @Task.create(IntervalTrigger(hours=1))
@@ -820,6 +832,9 @@ class APTracker(Extension):
                         or multiworld.last_activity() > tracker.last_refresh
                         or datetime.datetime.now(tz=datetime.UTC) - tracker.last_checked > datetime.timedelta(hours=3)
                     )
+                    if tracker.disabled:
+                        should_check = False
+
                     if should_check:
                         new_items = await tracker.refresh()
                     else:
@@ -840,7 +855,8 @@ class APTracker(Extension):
 
                     hints = []
                     try:
-                        hints = tracker.refresh_hints(multiworld)
+                        if not tracker.disabled:
+                            hints = tracker.refresh_hints(multiworld)
                     except Exception as e:
                         sentry_sdk.capture_exception(e)
                         logging.error(f"Failed to get hints for {tracker.name}")
@@ -951,7 +967,7 @@ class APTracker(Extension):
                     self.players = converter.structure(json.loads(f.read()), dict[int, Player])
                 for player in self.players.values():
                     if player.cheese_api_key:
-                        self.trackers.setdefault(player.id, [])
+                        self.get_trackers(player.id)
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)

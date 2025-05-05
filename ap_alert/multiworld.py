@@ -247,6 +247,7 @@ class TrackedGame:
     url: str  # https://archipelago.gg/tracker/tracker_id/0/slot_id
     id: int = -1
     latest_item: int = -1
+    disabled: bool = False
 
     name: str = None
     game: str = None
