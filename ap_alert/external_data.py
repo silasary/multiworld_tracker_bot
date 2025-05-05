@@ -92,6 +92,7 @@ async def import_datapackage(name: str, dp: Datapackage) -> Datapackage:
     DATAPACKAGES[name] = dp
 
     save_datapackage(name, dp)
+    name = getattr(dp, "game_name", None) or name
     await push(name)
 
     return dp
