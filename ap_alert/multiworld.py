@@ -118,6 +118,7 @@ class Filters(enum.Flag):
 
     everything = trap | filler | useful | progression | mcguffin
     useful_plus = useful | progression | mcguffin
+    useful_plus_progression = useful | progression
     progression_plus = progression | mcguffin
 
 
