@@ -396,17 +396,22 @@ class APTracker(Extension):
             if not name.endswith(port):
                 name = name + port
 
+        dp = self.datapackages.get(tracker.game)
+
+        last_refreshed = format_relative_time(tracker.last_refresh) or "Never"
+        last_item_name = f"{dp.icon(tracker.last_item[0])} {tracker.last_item[0]}" if tracker.last_item[0] else ""
+        last_item_time = format_relative_time(tracker.last_item[1]) if tracker.last_item[0] else "N/A"
+        prog_name = f"{dp.icon(tracker.last_progression[0])} {tracker.last_progression[0]}" if tracker.last_progression[0] else ""
+        prog_time = format_relative_time(tracker.last_progression[1]) if tracker.last_progression[0] else "N/A"
+        check_time = max(tracker.last_checked, tracker.last_activity)
+        last_activity = format_relative_time(check_time)
+
         embed = Embed(title=name)
         embed.set_author(tracker.game)
-        last_check = format_relative_time(tracker.last_refresh) or "Never"
-        embed.add_field("Last Refreshed", last_check)
-        last_item = format_relative_time(tracker.last_item[1]) if tracker.last_item[0] else "N/A"
-        embed.add_field("Last Item Received", tracker.last_item[0] + " " + last_item)
-        prog_time = format_relative_time(tracker.last_progression[1]) if tracker.last_progression[0] else "N/A"
-        embed.add_field("Last Progression Item", tracker.last_progression[0] + " " + prog_time)
-        check_time = max(tracker.last_checked, tracker.last_activity)
-        last_checked = format_relative_time(check_time)
-        embed.add_field("Progression Status", f"{tracker.progression_status.name} (Last Checked: {last_checked})")
+        embed.add_field("Last Refreshed", last_refreshed)
+        embed.add_field("Last Item Received", last_item_name + " " + last_item_time)
+        embed.add_field("Last Progression Item", prog_name + " " + prog_time)
+        embed.add_field("Progression Status", f"{tracker.progression_status.name} (Last Checked: {last_activity})")
         components = []
 
         components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji="💼", custom_id=f"inv:{tracker.id}"))
