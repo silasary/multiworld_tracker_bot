@@ -291,6 +291,10 @@ class TrackedGame:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(self.url) as response:
+                    if response.status == 500 and "/tracker/" in self.url:
+                        self.url = self.url.replace("/tracker/", "/generic_tracker/")
+                        return await self.refresh()
+
                     if response.status != 200:
                         self.failures += 1
                         return []
