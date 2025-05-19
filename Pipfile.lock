@@ -744,12 +744,12 @@
         },
         "jurigged": {
             "hashes": [
-                "sha256:27829ebb9f2f909c7d35d14331ba73bcbcf1a3f4aa9da3778fee4c1d0ebf245f",
-                "sha256:301d38e497474abd27c2906e3f74e1ad26836771d13108c6ccd8c03598b35d3a"
+                "sha256:2479f1e7463c29639ac7764672e2709391ff0910b3cf27125a7985f2a7b04355",
+                "sha256:840a53bee6963a85d0a4ea5055472526c6b1114ed78ef5a91bde146e9280b04b"
             ],
             "index": "pypi",
             "markers": "python_version >= '3.9'",
-            "version": "==0.6.0"
+            "version": "==0.6.1"
         },
         "multidict": {
             "hashes": [
@@ -941,11 +941,11 @@
         },
         "ovld": {
             "hashes": [
-                "sha256:097764be018fae98a6baf15e209bd1df5da1643ece40ef7fc59a0313d2a96e88",
-                "sha256:7891086d04e34641a11d8088f28426b4a55971f54f55b7f5278739e3a8927168"
+                "sha256:33a401989ab0de430f7599c68001a6722e715e2c46a913221ecac94a22cc0748",
+                "sha256:635c3b8f4885130f6b9c6832cd6cc38c640e1015f7a380277afb7e070c4a7b2f"
             ],
             "markers": "python_version >= '3.9'",
-            "version": "==0.4.6"
+            "version": "==0.5.5"
         },
         "propcache": {
             "hashes": [
