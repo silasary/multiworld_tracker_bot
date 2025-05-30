@@ -96,17 +96,6 @@ class Hint:
         return embed
 
 
-# class ItemClassification(enum.Flag):
-#     unknown = 0
-#     trap = 1
-#     filler = 2
-#     useful = 4
-#     progression = 8
-#     mcguffin = 16
-
-#     bad_name = 256
-
-
 class Filters(enum.Flag):
     none = 0
     trap = 1
@@ -359,7 +348,7 @@ class TrackedGame:
         if self.filters in [Filters.unset, Filters.everything]:
             return new_items
 
-        new_items = [i for i in new_items if i.classification == ItemClassification.unknown or self.filters & Filters(i.classification.value)]
+        new_items = [i for i in new_items if i.classification in [ItemClassification.unknown, ItemClassification.bad_name] or self.filters & Filters(i.classification.value)]
 
         return new_items
 
