@@ -34,7 +34,20 @@ from ap_alert.converter import converter
 from shared.exceptions import BadAPIKeyException
 
 from . import external_data
-from .multiworld import GAMES, Datapackage, Filters, HintFilters, ItemClassification, Multiworld, NetworkItem, Player, ProgressionStatus, TrackedGame, CompletionStatus
+from .multiworld import (
+    GAMES,
+    CheeselessMultiworld,
+    Datapackage,
+    Filters,
+    HintFilters,
+    ItemClassification,
+    Multiworld,
+    NetworkItem,
+    Player,
+    ProgressionStatus,
+    TrackedGame,
+    CompletionStatus,
+)
 from .worlds import TRACKERS
 
 regex_dash = re.compile(r"dash:(\d+)")
@@ -664,7 +677,7 @@ class APTracker(Extension):
         is_mw_abandoned = multiworld.last_activity() < datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)
 
         for game in multiworld.games.values():
-            game["url"] = f'https://archipelago.gg/tracker/{room}/0/{game["position"]}'
+            game["url"] = f'https://{multiworld.ap_hostname}/tracker/{room}/0/{game["position"]}'
 
             for t in self.get_trackers(player.id):
                 if t.url == game["url"]:
@@ -743,7 +756,9 @@ class APTracker(Extension):
                     "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
                     json={"url": ap_url},
                 ) as response:
-                    if response.status in [400, 403, 404]:
+                    if response.status == 403:
+                        return self.cheeseless(ap_url)
+                    if response.status in [400, 404]:
                         return room, None
                     ch_id = (await response.json()).get("tracker_id")
 
@@ -751,6 +766,10 @@ class APTracker(Extension):
             if not multiworld.title:
                 multiworld.title = room
         return room, multiworld
+
+    def cheeseless(self, url: str) -> tuple[str, Multiworld]:
+        """Return a cheeseless Multiworld object."""
+        return url.split("/")[-1], CheeselessMultiworld(url)
 
     def remove_tracker(self, player, tracker: str | TrackedGame) -> None:
         for t in self.get_trackers(player.id).copy():
@@ -809,7 +828,7 @@ class APTracker(Extension):
                     if tracker.id:
                         ids.add(tracker.id)
                     try:
-                        multiworld, _found = await self.sync_cheese(player, tracker.tracker_id)
+                        multiworld, _found = await self.sync_cheese(player, tracker.multitracker_url)
                     except IndexError:
                         tracker.failures += 1
                         continue

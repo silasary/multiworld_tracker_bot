@@ -3,6 +3,7 @@ import enum
 import json
 import logging
 from typing import TYPE_CHECKING, Optional
+import urllib.parse
 
 import aiohttp
 import interactions
@@ -274,7 +275,7 @@ class TrackedGame:
         return int(self.url.split("/")[-1])
 
     async def refresh(self) -> list[NetworkItem]:
-        if self.game is None:
+        if self.game is None or self.game == "None":
             await self.refresh_metadata()
         logging.info(f"Refreshing {self.url}")
         try:
@@ -354,7 +355,7 @@ class TrackedGame:
 
     async def refresh_metadata(self) -> None:
         logging.info(f"Refreshing metadata for {self.url}")
-        multitracker_url = "/".join(self.url.split("/")[:-2])
+        multitracker_url = self.multitracker_url
         async with aiohttp.ClientSession() as session:
             async with session.get(multitracker_url) as response:
                 if response.status != 200:
@@ -372,6 +373,11 @@ class TrackedGame:
                 self.game = slot["Game"]
                 # self.name = slot['Name']
                 break
+
+    @property
+    def multitracker_url(self):
+        multitracker_url = "/".join(self.url.split("/")[:-2])
+        return multitracker_url
 
     def process_locations(self, table: Tag) -> None:
         if table is None:
@@ -506,6 +512,52 @@ class Multiworld:
     @property
     def goaled(self) -> bool:
         return all(g.completion_status in [CompletionStatus.goal, CompletionStatus.done, CompletionStatus.released] for g in self.games.values())
+
+    @property
+    def ap_hostname(self) -> str:
+        """
+        Return the hostname of the AP server.
+        """
+        if self.upstream_url:
+            uri = urllib.parse.urlparse(self.upstream_url)
+            return uri.hostname or "archipelago.gg"
+        return "archipelago.gg"
+
+
+@attrs.define()
+class CheeselessMultiworld(Multiworld):
+    async def refresh(self, force: bool = False) -> None:
+        self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
+        if self.upstream_url is None:
+            self.upstream_url = self.url
+        if self.games is None:
+            self.games = {}
+        logging.info(f"Refreshing cheeseless {self.url}")
+        multitracker_url = self.url
+        async with aiohttp.ClientSession() as session:
+            async with session.get(multitracker_url) as response:
+                if response.status != 200:
+                    return
+                html = await response.text()
+        soup = BeautifulSoup(html, features="html.parser")
+        title = soup.find("title").string
+        if title == "Page Not Found (404)":
+            return
+        slots = process_table(soup.find(id="checks-table"))
+        for slot in slots:
+            slot_id = slot["#"]
+            if slot_id == "Total":
+                continue
+            inactivity = slot.get(None, None)
+            if inactivity is not None and inactivity != "None":
+                last_activity = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(seconds=float(inactivity))
+            else:
+                last_activity = datetime.datetime.fromisoformat(slot.get("Last Activity", "1970-01-01T00:00:00Z"))
+
+            if slot_id not in self.games:
+                self.games[slot_id] = CheeseGame({"name": slot["Name"], "game": slot["Game"], "position": int(slot_id)})
+            self.games[slot_id].update({"game": slot["Game"], "last_activity": last_activity.isoformat()})
+        self.last_update = datetime.datetime.now(tz=datetime.UTC)
 
 
 def process_table(table: Tag) -> list[dict]:
