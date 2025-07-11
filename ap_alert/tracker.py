@@ -153,7 +153,7 @@ class APTracker(Extension):
             if multiworld is None:
                 await ctx.send(f"An error has occurred.  Could not set up `{room}` with {url}", ephemeral=True)
                 return
-            await ctx.send(f"Setting up tracker for https://archipelago.gg/tracker/{room}...", ephemeral=ephemeral)
+            await ctx.send(f"Setting up tracker for https://{multiworld.ap_hostname}/tracker/{room}...", ephemeral=ephemeral)
             await multiworld.refresh()
             slot = multiworld.games[int(url.split("/")[-1])]
             tracker.game = slot["game"]
