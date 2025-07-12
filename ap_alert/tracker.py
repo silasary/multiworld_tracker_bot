@@ -31,7 +31,9 @@ from interactions.models.internal.tasks import IntervalTrigger, Task
 from requests.structures import CaseInsensitiveDict
 
 from ap_alert.converter import converter
+from discordbot.db import db
 from shared.exceptions import BadAPIKeyException
+from shared.mongocache import MongoCache
 
 from . import external_data
 from .multiworld import GAMES, Datapackage, Filters, HintFilters, ItemClassification, Multiworld, NetworkItem, Player, ProgressionStatus, TrackedGame, CompletionStatus
@@ -55,18 +57,27 @@ class APTracker(Extension):
         self.cheese: dict[str, Multiworld] = CaseInsensitiveDict()
         self.datapackages: dict[str, Datapackage] = {}
         self.players: dict[int, Player] = {}
+        self.player_db = MongoCache(Player, db["players"])
+        self.tracker_db = MongoCache(TrackedGame, db["trackers"])
         self.stats = {}
         self.load()
 
     def get_player_settings(self, id: int) -> Player:
+        """Get the player settings for a user.  If they don't exist, create them."""
+        player = self.player_db.get(id)
+        if player is not None:
+            return player
         player = self.players.get(id)
         if player is None:
             player = Player(id)
             self.players[id] = player
+        self.player_db[id] = player
         return player
 
     def get_trackers(self, id: int) -> list[TrackedGame]:
-        return self.trackers.setdefault(id, [])
+        """Get the trackers for a user."""
+        tracker_list = self.trackers.setdefault(id, [])
+        return tracker_list
 
     @property
     def user_count(self):
@@ -942,6 +953,7 @@ class APTracker(Extension):
         stats = json.dumps(self.stats, indent=2)
         with open("stats.json", "w") as f:
             f.write(stats)
+        self.player_db.flush()
 
     def load(self):
         if os.path.exists("trackers.json"):
