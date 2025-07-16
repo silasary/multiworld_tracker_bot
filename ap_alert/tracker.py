@@ -50,22 +50,22 @@ from .multiworld import (
 )
 from .worlds import TRACKERS
 
-regex_dash = re.compile(r"dash:(\d+)")
+regex_dash = re.compile(r"dash:(-?\d+)")
 regex_unblock = re.compile(r"unblock:(\d+)")
-regex_remove = re.compile(r"remove:(\d+)")
-regex_disable = re.compile(r"disable:(\d+)")
+regex_remove = re.compile(r"remove:(-?\d+)")
+regex_disable = re.compile(r"disable:(-?\d+)")
 regex_bk = re.compile(r"bk:(\d+)")
-regex_inv = re.compile(r"inv:(\d+)")
-regex_settings = re.compile(r"settings:(\d+)")
-regex_filter = re.compile(r"filter:(\d+|default):(\d+)")
-regex_hint_filter = re.compile(r"hint_filter:(\d+|default):(\d+)")
+regex_inv = re.compile(r"inv:(-?\d+)")
+regex_settings = re.compile(r"settings:(-?\d+)")
+regex_filter = re.compile(r"filter:(\d+|default):(-?\d+)")
+regex_hint_filter = re.compile(r"hint_filter:(\d+|default):(-?\d+)")
 
 
 class APTracker(Extension):
     def __init__(self, bot: Client) -> None:
         self.bot: Client = bot
         self.trackers: dict[int, list[TrackedGame]] = {}
-        self.cheese: dict[str, Multiworld] = CaseInsensitiveDict()
+        self.cheese: dict[str, Multiworld | CheeselessMultiworld] = CaseInsensitiveDict()
         self.datapackages: dict[str, Datapackage] = {}
         self.players: dict[int, Player] = {}
         self.stats = {}
@@ -388,8 +388,9 @@ class APTracker(Extension):
                 colour = ButtonStyle.GREEN
             if tracker.id == -1:
                 tracker.id = min(trackers, key=lambda x: x.id).id - 1
+                self.save()
 
-            buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.id}", disabled=tracker.id < 1))
+            buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.id}"))
         buttons.sort(key=lambda x: x.style)
         pages = chunk(buttons, 25)
         for page in pages:
@@ -677,7 +678,7 @@ class APTracker(Extension):
         is_mw_abandoned = multiworld.last_activity() < datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=30)
 
         for game in multiworld.games.values():
-            game["url"] = f'https://{multiworld.ap_hostname}/tracker/{room}/0/{game["position"]}'
+            game["url"] = f'{multiworld.ap_scheme}://{multiworld.ap_hostname}/tracker/{room}/0/{game["position"]}'
 
             for t in self.get_trackers(player.id):
                 if t.url == game["url"]:
@@ -910,6 +911,7 @@ class APTracker(Extension):
             except Exception as e:
                 sentry_sdk.capture_exception(e)
                 logging.error(f"Failed to refresh trackers for {user}")
+                print(e)
                 await asyncio.sleep(5)
 
         to_delete = []
@@ -949,7 +951,7 @@ class APTracker(Extension):
         trackers = json.dumps(converter.unstructure(self.trackers), indent=2)
         with open("trackers.json", "w") as f:
             f.write(trackers)
-        cheese = json.dumps(converter.unstructure(self.cheese), indent=2)
+        cheese = json.dumps(converter.unstructure(self.cheese, Multiworld | CheeselessMultiworld), indent=2)
         with open("cheese.json", "w") as f:
             f.write(cheese)
         dp = json.dumps(converter.unstructure(self.datapackages), indent=2)
@@ -969,7 +971,7 @@ class APTracker(Extension):
         try:
             if os.path.exists("cheese.json"):
                 with open("cheese.json") as f:
-                    self.cheese = converter.structure(json.loads(f.read()), dict[str, Multiworld])
+                    self.cheese = converter.structure(json.loads(f.read()), dict[str, Multiworld | CheeselessMultiworld])
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)

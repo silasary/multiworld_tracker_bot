@@ -15,8 +15,6 @@ from bs4 import BeautifulSoup, Tag
 from shared.exceptions import BadAPIKeyException
 from world_data.models import Datapackage, ItemClassification
 
-from .converter import converter
-
 if TYPE_CHECKING:
     from enum import StrEnum as CursedStrEnum
 else:
@@ -453,15 +451,15 @@ class TrackedGame:
 @attrs.define()
 class Multiworld:
     url: str  # https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/room_id
-    tracker_id: str = None
-    title: str = None
-    games: dict[int, CheeseGame] = None
-    last_refreshed: datetime.datetime = None
-    last_update: datetime.datetime = None
-    upstream_url: str = None
-    room_link: str = None
+    tracker_id: str | None = None
+    title: str | None = None
+    games: dict[int, CheeseGame] = attrs.field(factory=dict)
+    last_refreshed: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
+    last_update: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
+    upstream_url: str | None = None
+    room_link: str | None = None
     last_port: Optional[int] = None
-    hints: list[dict] | None = None
+    hints: list[dict] | None = attrs.field(factory=list)
 
     async def refresh(self, force: bool = False) -> None:
         if (
@@ -498,6 +496,8 @@ class Multiworld:
 
     async def put(self, game: CheeseGame) -> None:
         # PUT https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/MMV8lMURTE6KoOLAPSs2Dw/game/63591
+        from .converter import converter
+
         game = converter.unstructure(game)  # convert datetime to isoformat
         async with aiohttp.ClientSession() as session:
             async with session.put(f"{self.url}/game/{game['id']}", json=game) as response:
@@ -523,6 +523,16 @@ class Multiworld:
             return uri.hostname or "archipelago.gg"
         return "archipelago.gg"
 
+    @property
+    def ap_scheme(self) -> str:
+        """
+        Return the scheme of the AP server.
+        """
+        if self.upstream_url:
+            uri = urllib.parse.urlparse(self.upstream_url)
+            return uri.scheme or "https"
+        return "https"
+
 
 @attrs.define()
 class CheeselessMultiworld(Multiworld):
@@ -532,6 +542,9 @@ class CheeselessMultiworld(Multiworld):
             self.upstream_url = self.url
         if self.games is None:
             self.games = {}
+        if self.room_link == "None":
+            self.room_link = None
+        self.tracker_id = self.url.split("/")[-1]
         logging.info(f"Refreshing cheeseless {self.url}")
         multitracker_url = self.url
         async with aiohttp.ClientSession() as session:
@@ -549,6 +562,7 @@ class CheeselessMultiworld(Multiworld):
             if slot_id == "Total":
                 continue
             inactivity = slot.get(None, None)
+            checks_done, checks_total = slot.get("Checks", "0/0").split("/")
             if inactivity is not None and inactivity != "None":
                 last_activity = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(seconds=float(inactivity))
             else:
@@ -556,7 +570,8 @@ class CheeselessMultiworld(Multiworld):
 
             if slot_id not in self.games:
                 self.games[slot_id] = CheeseGame({"name": slot["Name"], "game": slot["Game"], "position": int(slot_id)})
-            self.games[slot_id].update({"game": slot["Game"], "last_activity": last_activity.isoformat()})
+            self.games[slot_id].update({"game": slot["Game"], "last_activity": last_activity.isoformat(), "checks_done": int(checks_done), "checks_total": int(checks_total)})
+
         self.last_update = datetime.datetime.now(tz=datetime.UTC)
 
 
