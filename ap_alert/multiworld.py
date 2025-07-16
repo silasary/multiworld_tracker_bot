@@ -572,7 +572,7 @@ class CheeselessMultiworld(Multiworld):
                 self.games[slot_id] = CheeseGame({"name": slot["Name"], "game": slot["Game"], "position": int(slot_id)})
             self.games[slot_id].update({"game": slot["Game"], "last_activity": last_activity.isoformat(), "checks_done": int(checks_done), "checks_total": int(checks_total)})
 
-        self.last_update = datetime.datetime.now(tz=datetime.UTC)
+        self.last_update = max(g.last_activity for g in self.games.values())
 
 
 def process_table(table: Tag) -> list[dict]:
