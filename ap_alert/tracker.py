@@ -752,6 +752,8 @@ class APTracker(Extension):
         if multiworld is None:
             if ap_url is None:
                 ap_url = f"https://archipelago.gg/tracker/{room}"
+            if "generic_tracker" in ap_url:
+                ap_url = ap_url.replace("generic_tracker", "tracker")
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
