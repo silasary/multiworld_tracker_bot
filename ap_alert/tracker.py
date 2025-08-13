@@ -62,13 +62,14 @@ regex_hint_filter = re.compile(r"hint_filter:(\d+|default):(-?\d+)")
 
 
 class APTracker(Extension):
+    stats: dict[str, int] = {}
+
     def __init__(self, bot: Client) -> None:
         self.bot: Client = bot
         self.trackers: dict[int, list[TrackedGame]] = {}
         self.cheese: dict[str, Multiworld | CheeselessMultiworld] = CaseInsensitiveDict()
         self.datapackages: dict[str, Datapackage] = {}
         self.players: dict[int, Player] = {}
-        self.stats = {}
         self.load()
 
     def get_player_settings(self, id: int) -> Player:

@@ -291,6 +291,10 @@ class TrackedGame:
             # This is a bad URL, don't try again
             self.failures = 100
             return []
+        except aiohttp.ClientConnectorError as e:
+            logging.error(f"Connection error occurred while processing tracker {self.id}: {e}")
+            self.failures += 1
+            return []
         # html = requests.get(self.url).content
         soup = BeautifulSoup(html, features="html.parser")
         title = soup.find("title").string
@@ -341,6 +345,8 @@ class TrackedGame:
 
         self.latest_item = rows[-1][index_order]
         self.new_items = new_items
+
+        self.failures = 0
 
         if self.filters == Filters.none:
             return []
