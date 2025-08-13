@@ -292,7 +292,7 @@ class TrackedGame:
             self.failures = 100
             return []
         except aiohttp.ClientConnectorError as e:
-            logging.error(f"Connection error occurred while processing tracker {self.id}: {e}")
+            logging.error(f"Connection error occurred while processing tracker {self.url}: {e}")
             self.failures += 1
             return []
         # html = requests.get(self.url).content
