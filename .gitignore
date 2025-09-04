@@ -14,3 +14,5 @@ config.json
 /stats.json
 /players.json
 /world_data/
+
+/.env

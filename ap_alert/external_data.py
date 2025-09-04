@@ -67,6 +67,7 @@ async def update_all(dps: dict[str, Datapackage]) -> None:
     """Update all datapackages."""
     for name, dp in dps.copy().items():
         await import_datapackage(name, dp)
+    await push()
 
 
 async def load_all(dps: dict[str, Datapackage]) -> None:
@@ -74,6 +75,7 @@ async def load_all(dps: dict[str, Datapackage]) -> None:
     await clone_repo()
     for name, dp in dps.items():
         await import_datapackage(name, dp)
+    await push()
 
 
 async def import_datapackage(name: str, dp: Datapackage) -> Datapackage:
@@ -93,13 +95,11 @@ async def import_datapackage(name: str, dp: Datapackage) -> Datapackage:
 
     save_datapackage(name, dp)
     name = getattr(dp, "game_name", None) or name
-    await push(name)
 
     return dp
 
 
-async def push(name: str) -> None:
-    safe_name = name.replace("/", "_").replace(":", "_")
+async def push() -> None:
     output = await git_output(["diff", "--numstat"], cwd="world_data")
     if output.strip():
         raw_lines_added = sum(int(x.split("\t")[0]) for x in output.splitlines())
@@ -107,8 +107,8 @@ async def push(name: str) -> None:
         lines_added = raw_lines_added - raw_lines_removed
         lines_updated = raw_lines_added - lines_added
 
-        await git(["add", f"worlds/{safe_name}/progression.txt"], cwd="world_data")
-        message = f"{name}:"
+        await git(["add", "worlds"], cwd="world_data")
+        message = "Update:"
         if lines_added > 0:
             message += f" {lines_added} items added"
         if lines_updated > 0:

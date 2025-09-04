@@ -3,6 +3,7 @@ import enum
 import json
 import logging
 from typing import TYPE_CHECKING, Optional
+import urllib.parse
 
 import aiohttp
 import interactions
@@ -13,8 +14,6 @@ from bs4 import BeautifulSoup, Tag
 
 from shared.exceptions import BadAPIKeyException
 from world_data.models import Datapackage, ItemClassification
-
-from .converter import converter
 
 if TYPE_CHECKING:
     from enum import StrEnum as CursedStrEnum
@@ -94,17 +93,6 @@ class Hint:
             embed["fields"] = [{"name": "Classification", "value": self.classification.title()}]
 
         return embed
-
-
-# class ItemClassification(enum.Flag):
-#     unknown = 0
-#     trap = 1
-#     filler = 2
-#     useful = 4
-#     progression = 8
-#     mcguffin = 16
-
-#     bad_name = 256
 
 
 class Filters(enum.Flag):
@@ -285,12 +273,16 @@ class TrackedGame:
         return int(self.url.split("/")[-1])
 
     async def refresh(self) -> list[NetworkItem]:
-        if self.game is None:
+        if self.game is None or self.game == "None":
             await self.refresh_metadata()
         logging.info(f"Refreshing {self.url}")
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(self.url) as response:
+                    if response.status == 500 and "/tracker/" in self.url:
+                        self.url = self.url.replace("/tracker/", "/generic_tracker/")
+                        return await self.refresh()
+
                     if response.status != 200:
                         self.failures += 1
                         return []
@@ -298,6 +290,10 @@ class TrackedGame:
         except aiohttp.InvalidUrlClientError:
             # This is a bad URL, don't try again
             self.failures = 100
+            return []
+        except aiohttp.ClientConnectorError as e:
+            logging.error(f"Connection error occurred while processing tracker {self.url}: {e}")
+            self.failures += 1
             return []
         # html = requests.get(self.url).content
         soup = BeautifulSoup(html, features="html.parser")
@@ -350,18 +346,20 @@ class TrackedGame:
         self.latest_item = rows[-1][index_order]
         self.new_items = new_items
 
+        self.failures = 0
+
         if self.filters == Filters.none:
             return []
         if self.filters in [Filters.unset, Filters.everything]:
             return new_items
 
-        new_items = [i for i in new_items if i.classification == ItemClassification.unknown or self.filters & Filters(i.classification.value)]
+        new_items = [i for i in new_items if i.classification in [ItemClassification.unknown, ItemClassification.bad_name] or self.filters & Filters(i.classification.value)]
 
         return new_items
 
     async def refresh_metadata(self) -> None:
         logging.info(f"Refreshing metadata for {self.url}")
-        multitracker_url = "/".join(self.url.split("/")[:-2])
+        multitracker_url = self.multitracker_url
         async with aiohttp.ClientSession() as session:
             async with session.get(multitracker_url) as response:
                 if response.status != 200:
@@ -379,6 +377,11 @@ class TrackedGame:
                 self.game = slot["Game"]
                 # self.name = slot['Name']
                 break
+
+    @property
+    def multitracker_url(self):
+        multitracker_url = "/".join(self.url.split("/")[:-2])
+        return multitracker_url
 
     def process_locations(self, table: Tag) -> None:
         if table is None:
@@ -454,15 +457,15 @@ class TrackedGame:
 @attrs.define()
 class Multiworld:
     url: str  # https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/room_id
-    tracker_id: str = None
-    title: str = None
-    games: dict[int, CheeseGame] = None
-    last_refreshed: datetime.datetime = None
-    last_update: datetime.datetime = None
-    upstream_url: str = None
-    room_link: str = None
+    tracker_id: str | None = None
+    title: str | None = None
+    games: dict[int, CheeseGame] = attrs.field(factory=dict)
+    last_refreshed: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
+    last_update: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
+    upstream_url: str | None = None
+    room_link: str | None = None
     last_port: Optional[int] = None
-    hints: list[dict] | None = None
+    hints: list[dict] | None = attrs.field(factory=list)
 
     async def refresh(self, force: bool = False) -> None:
         if (
@@ -499,6 +502,8 @@ class Multiworld:
 
     async def put(self, game: CheeseGame) -> None:
         # PUT https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/MMV8lMURTE6KoOLAPSs2Dw/game/63591
+        from .converter import converter
+
         game = converter.unstructure(game)  # convert datetime to isoformat
         async with aiohttp.ClientSession() as session:
             async with session.put(f"{self.url}/game/{game['id']}", json=game) as response:
@@ -513,6 +518,67 @@ class Multiworld:
     @property
     def goaled(self) -> bool:
         return all(g.completion_status in [CompletionStatus.goal, CompletionStatus.done, CompletionStatus.released] for g in self.games.values())
+
+    @property
+    def ap_hostname(self) -> str:
+        """
+        Return the hostname of the AP server.
+        """
+        if self.upstream_url:
+            uri = urllib.parse.urlparse(self.upstream_url)
+            return uri.hostname or "archipelago.gg"
+        return "archipelago.gg"
+
+    @property
+    def ap_scheme(self) -> str:
+        """
+        Return the scheme of the AP server.
+        """
+        if self.upstream_url:
+            uri = urllib.parse.urlparse(self.upstream_url)
+            return uri.scheme or "https"
+        return "https"
+
+
+@attrs.define()
+class CheeselessMultiworld(Multiworld):
+    async def refresh(self, force: bool = False) -> None:
+        self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
+        if self.upstream_url is None:
+            self.upstream_url = self.url
+        if self.games is None:
+            self.games = {}
+        if self.room_link == "None":
+            self.room_link = None
+        self.tracker_id = self.url.split("/")[-1]
+        logging.info(f"Refreshing cheeseless {self.url}")
+        multitracker_url = self.url
+        async with aiohttp.ClientSession() as session:
+            async with session.get(multitracker_url) as response:
+                if response.status != 200:
+                    return
+                html = await response.text()
+        soup = BeautifulSoup(html, features="html.parser")
+        title = soup.find("title").string
+        if title == "Page Not Found (404)":
+            return
+        slots = process_table(soup.find(id="checks-table"))
+        for slot in slots:
+            slot_id = slot["#"]
+            if slot_id == "Total":
+                continue
+            inactivity = slot.get(None, None)
+            checks_done, checks_total = slot.get("Checks", "0/0").split("/")
+            if inactivity is not None and inactivity != "None":
+                last_activity = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(seconds=float(inactivity))
+            else:
+                last_activity = datetime.datetime.fromisoformat(slot.get("Last Activity", "1970-01-01T00:00:00Z"))
+
+            if slot_id not in self.games:
+                self.games[slot_id] = CheeseGame({"name": slot["Name"], "game": slot["Game"], "position": int(slot_id)})
+            self.games[slot_id].update({"game": slot["Game"], "last_activity": last_activity.isoformat(), "checks_done": int(checks_done), "checks_total": int(checks_total)})
+
+        self.last_update = max(g.last_activity for g in self.games.values())
 
 
 def process_table(table: Tag) -> list[dict]:
