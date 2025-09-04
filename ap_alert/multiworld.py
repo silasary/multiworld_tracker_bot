@@ -260,6 +260,8 @@ class TrackedGame:
     finder_hints: dict[int, Hint] = attrs.field(factory=dict, repr=False)
     receiver_hints: dict[int, Hint] = attrs.field(factory=dict, repr=False)
 
+    notification_queue: list[NetworkItem] = attrs.field(factory=list, repr=False)
+
     def __hash__(self) -> int:
         return hash(self.url)
 
@@ -272,7 +274,7 @@ class TrackedGame:
     def slot_id(self) -> int:
         return int(self.url.split("/")[-1])
 
-    async def refresh(self) -> list[NetworkItem]:
+    async def refresh(self) -> bool:
         if self.game is None or self.game == "None":
             await self.refresh_metadata()
         logging.info(f"Refreshing {self.url}")
@@ -285,7 +287,7 @@ class TrackedGame:
 
                     if response.status != 200:
                         self.failures += 1
-                        return []
+                        return False
                     html = await response.text()
         except aiohttp.InvalidUrlClientError:
             # This is a bad URL, don't try again
@@ -294,13 +296,13 @@ class TrackedGame:
         except aiohttp.ClientConnectorError as e:
             logging.error(f"Connection error occurred while processing tracker {self.url}: {e}")
             self.failures += 1
-            return []
+            return False
         # html = requests.get(self.url).content
         soup = BeautifulSoup(html, features="html.parser")
         title = soup.find("title").string
         if title == "Page Not Found (404)":
             self.failures += 1
-            return []
+            return False
         recieved = soup.find(id="received-table")
         if recieved is None:
             if "/tracker/" in self.url:
@@ -312,7 +314,7 @@ class TrackedGame:
         rows = process_table(recieved)
         self.last_refresh = datetime.datetime.now(tz=datetime.timezone.utc)
         if not rows:
-            return []
+            return False
 
         index_order = "Last Order Received"
         index_amount = "Amount"
@@ -321,10 +323,10 @@ class TrackedGame:
         rows.sort(key=lambda r: r[index_order])
         if rows[-1][index_order] < self.latest_item:
             self.latest_item = -1
-            return [("Rollback detected!",)]
+            return False
         is_up_to_date = rows[-1][index_order] == self.latest_item
         if is_up_to_date and self.all_items:
-            return []
+            return False
 
         new_items: list[NetworkItem] = []
         for r in rows:
@@ -338,7 +340,7 @@ class TrackedGame:
                         self.last_progression = (r[index_item], datetime.datetime.now(tz=datetime.UTC))
 
         if is_up_to_date:
-            return []
+            return False
 
         self.last_item = (rows[-1][index_item], datetime.datetime.now(tz=datetime.UTC))
         self.last_recieved = datetime.datetime.now(tz=datetime.UTC)
@@ -349,13 +351,15 @@ class TrackedGame:
         self.failures = 0
 
         if self.filters == Filters.none:
-            return []
+            return False
         if self.filters in [Filters.unset, Filters.everything]:
-            return new_items
+            self.notification_queue.extend(new_items)
+            return True
 
         new_items = [i for i in new_items if i.classification in [ItemClassification.unknown, ItemClassification.bad_name] or self.filters & Filters(i.classification.value)]
 
-        return new_items
+        self.notification_queue.extend(new_items)
+        return bool(new_items)
 
     async def refresh_metadata(self) -> None:
         logging.info(f"Refreshing metadata for {self.url}")
@@ -498,6 +502,8 @@ class Multiworld:
         """
         Return the last activity time of any game in the multiworld.
         """
+        if not self.games:
+            return datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")
         return max(g.last_activity for g in self.games.values())
 
     async def put(self, game: CheeseGame) -> None:
@@ -554,10 +560,14 @@ class CheeselessMultiworld(Multiworld):
         logging.info(f"Refreshing cheeseless {self.url}")
         multitracker_url = self.url
         async with aiohttp.ClientSession() as session:
-            async with session.get(multitracker_url) as response:
-                if response.status != 200:
-                    return
-                html = await response.text()
+            try:
+                async with session.get(multitracker_url) as response:
+                    if response.status != 200:
+                        return
+                    html = await response.text()
+            except aiohttp.ClientConnectorError as e:
+                logging.error(f"Connection error occurred while processing tracker {self.url}: {e}")
+                return
         soup = BeautifulSoup(html, features="html.parser")
         title = soup.find("title").string
         if title == "Page Not Found (404)":

@@ -70,7 +70,7 @@ class APTracker(Extension):
         self.bot: Client = bot
         self.trackers: dict[int, list[TrackedGame]] = {}
         self.cheese: dict[str, Multiworld | CheeselessMultiworld] = CaseInsensitiveDict()
-        self.datapackages: dict[str, Datapackage] = {}
+        self.datapackages: dict[str, Datapackage] = CaseInsensitiveDict()
         self.players: dict[int, Player] = {}
         self.player_db = MongoCache(Player, db["players"])
         self.tracker_db = MongoCache(TrackedGame, db["trackers"])
@@ -205,7 +205,7 @@ class APTracker(Extension):
         for tracker in self.get_trackers(ctx.author_id).copy():
             new_items = await tracker.refresh()
             if new_items:
-                games[tracker] = new_items
+                games[tracker] = tracker.notification_queue.copy()
             if tracker.failures >= 3:
                 self.remove_tracker(ctx.author, tracker)
                 await ctx.send(f"Tracker {tracker.url} has been removed due to errors", ephemeral=ephemeral)
@@ -217,10 +217,10 @@ class APTracker(Extension):
             return
 
         for tracker, items in games.items():
-            await self.send_new_items(ctx, tracker, items, ephemeral)
+            await self.send_new_items(ctx, tracker, ephemeral=ephemeral)
 
         for tracker, items in games.items():
-            await self.try_classify(ctx, tracker, items, ephemeral)
+            await self.try_classify(ctx, tracker, items, ephemeral=ephemeral)
         self.save()
 
     @ap.subcommand("authenticate")
@@ -307,7 +307,7 @@ class APTracker(Extension):
         self,
         ctx_or_user: SlashContext | User,
         tracker: TrackedGame,
-        new_items: list[NetworkItem],
+        *,
         ephemeral: bool = False,
         inventory: bool = False,
     ) -> Message:
@@ -333,6 +333,13 @@ class APTracker(Extension):
             if inventory:
                 return f"{emoji} {item.name} x{item.quantity}"
             return f"{emoji} {item.name}"
+
+        if inventory:
+            new_items = list(NetworkItem(i, tracker.game, tracker.all_items[i]) for i in tracker.all_items)
+        else:
+            new_items = tracker.notification_queue.copy()
+
+        tracker.notification_queue.clear()
 
         names = [await icon(i) for i in new_items]
         slot_name = tracker.name or tracker.url
@@ -540,7 +547,7 @@ class APTracker(Extension):
             return
         if not tracker.all_items:
             await tracker.refresh()
-        await self.send_new_items(ctx, tracker, list(NetworkItem(i, tracker.game, tracker.all_items[i]) for i in tracker.all_items), ephemeral=True, inventory=True)
+        await self.send_new_items(ctx, tracker, ephemeral=True, inventory=True)
 
     @component_callback(regex_settings)
     async def settings(self, ctx: ComponentContext) -> None:
@@ -874,7 +881,7 @@ class APTracker(Extension):
                         if should_check:
                             new_items = await tracker.refresh()
                         else:
-                            new_items = []
+                            new_items = False
 
                         try:
                             if not new_items and tracker.failures > 10:
@@ -882,8 +889,9 @@ class APTracker(Extension):
                                 await player.send(f"Tracker {tracker.url} has been removed due to errors")
                                 continue
                             if new_items:
-                                await self.send_new_items(player, tracker, new_items)
-                                asyncio.create_task(self.try_classify(player, tracker, new_items))
+                                items = tracker.notification_queue.copy()
+                                await self.send_new_items(player, tracker)
+                                asyncio.create_task(self.try_classify(player, tracker, items))
                         except Forbidden:
                             logging.error(f"Failed to send message to {player.global_name} ({player.id})")
                             tracker.failures += 1
