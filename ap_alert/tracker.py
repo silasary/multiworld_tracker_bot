@@ -426,7 +426,6 @@ class APTracker(Extension):
                 colour = ButtonStyle.GREEN
             if tracker.cheese_id == -1:
                 tracker.cheese_id = min(trackers, key=lambda x: x.cheese_id).cheese_id - 1
-                self.save()
 
             buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.cheese_id}"))
         buttons.sort(key=lambda x: x.style)
@@ -510,7 +509,6 @@ class APTracker(Extension):
             return
         self.get_trackers(ctx.author_id).remove(tracker)
         await ctx.send("Tracker removed", ephemeral=True)
-        self.save()
 
     @component_callback(regex_disable)
     async def disable(self, ctx: ComponentContext) -> None:
@@ -521,7 +519,6 @@ class APTracker(Extension):
             return
         tracker.disabled = True
         await ctx.send("Tracker removed", ephemeral=True)
-        self.save()
 
     @component_callback(regex_unblock)
     async def unblock(self, ctx: ComponentContext) -> None:
@@ -629,7 +626,6 @@ class APTracker(Extension):
             player_settings = self.get_player_settings(ctx.author_id)
             player_settings.default_filters = Filters(int(m.group(2)))
             await ctx.send("Default filter updated", ephemeral=True)
-            self.save()
             return
 
         tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
@@ -637,7 +633,6 @@ class APTracker(Extension):
             return
         tracker.filters = Filters(int(m.group(2)))
         await ctx.send("Filter updated", ephemeral=True)
-        self.save()
 
     @component_callback(regex_hint_filter)
     async def hint_filter(self, ctx: ComponentContext) -> None:
@@ -647,7 +642,6 @@ class APTracker(Extension):
             player_settings = self.get_player_settings(ctx.author_id)
             player_settings.default_hint_filters = HintFilters(int(m.group(2)))
             await ctx.send("Default hint filter updated", ephemeral=True)
-            self.save()
             return
 
         tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
@@ -655,7 +649,6 @@ class APTracker(Extension):
             return
         tracker.hint_filters = HintFilters(int(m.group(2)))
         await ctx.send("Hint filter updated", ephemeral=True)
-        self.save()
 
     @ap.subcommand("settings")
     async def ap_settings(self, ctx: SlashContext) -> None:
@@ -737,7 +730,6 @@ class APTracker(Extension):
 
                     tracker = TrackedGame(game["url"])
                     self.get_trackers(player.id).append(tracker)
-                    self.save()
                     tracker.game = game["game"]
                     await self.check_for_dp(tracker)
 
@@ -867,12 +859,10 @@ class APTracker(Extension):
                         if tracker.failures >= 10:
                             self.remove_tracker(player, tracker)
                             await player.send(f"Tracker {tracker.url} has been removed due to errors")
-                            self.save()
                             continue
 
                         if tracker.url in urls:
                             self.remove_tracker(player, tracker)
-                            self.save()
                             continue
                         urls.add(tracker.url)
 
@@ -889,7 +879,6 @@ class APTracker(Extension):
                             if tracker.failures >= 3:
                                 self.remove_tracker(player, tracker.url)
                                 await player.send(f"Tracker {tracker.url} has been removed due to errors")
-                            self.save()
                             continue
 
                         if tracker.filters == Filters.unset and player_settings.default_filters != Filters.unset:
@@ -957,9 +946,6 @@ class APTracker(Extension):
 
                 if trackers:
                     user_count += 1
-                if progress > 10:
-                    self.save()
-                    progress = 0
             except Exception as e:
                 sentry_sdk.capture_exception(e)
                 logging.error(f"Failed to refresh trackers for {user}")
