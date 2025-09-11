@@ -30,7 +30,7 @@ CompletionStatus = CursedStrEnum("CompletionStatus", "unknown incomplete all_che
 
 @attrs.define()
 class Hint:
-    id: int
+    id: str = attrs.field(converter=str)
     item: str
     location: str
     entrance: str
@@ -233,7 +233,9 @@ class Player:
 @attrs.define()
 class TrackedGame:
     url: str  # https://archipelago.gg/tracker/tracker_id/0/slot_id
-    id: int = -1
+    _id: Optional[str] = attrs.field(default=None)  # MongoDB document ID
+    user_id: int = -1
+    cheese_id: int = -1
     latest_item: int = -1
     disabled: bool = False
 
@@ -257,8 +259,8 @@ class TrackedGame:
     checks: dict[str, bool] = attrs.field(factory=dict, repr=False)
 
     # hints: list[Hint] = attrs.field(factory=list)
-    finder_hints: dict[int, Hint] = attrs.field(factory=dict, repr=False)
-    receiver_hints: dict[int, Hint] = attrs.field(factory=dict, repr=False)
+    finder_hints: dict[str, Hint] = attrs.field(factory=dict, repr=False)
+    receiver_hints: dict[str, Hint] = attrs.field(factory=dict, repr=False)
 
     notification_queue: list[NetworkItem] = attrs.field(factory=list, repr=False)
 
@@ -292,7 +294,7 @@ class TrackedGame:
         except aiohttp.InvalidUrlClientError:
             # This is a bad URL, don't try again
             self.failures = 100
-            return []
+            return False
         except aiohttp.ClientConnectorError as e:
             logging.error(f"Connection error occurred while processing tracker {self.url}: {e}")
             self.failures += 1
@@ -396,7 +398,7 @@ class TrackedGame:
 
     def update(self, data: CheeseGame) -> None:
         self.game = data.game
-        self.id = data.id
+        self.cheese_id = data.id
         self.progression_status = ProgressionStatus(data.progression_status)
         self.last_checked = data.last_checked
         self.last_activity = data.last_activity
@@ -411,8 +413,8 @@ class TrackedGame:
         elif filters == HintFilters.unset:
             filters = HintFilters.all
         updated = []
-        finder_hints = [Hint(**h, is_finder=True) for h in data if h.get("finder_game_id") == self.id]
-        receiver_hints = [Hint(**h, is_finder=False) for h in data if h.get("receiver_game_id") == self.id and h.get("finder_game_id") != self.id]
+        finder_hints = [Hint(**h, is_finder=True) for h in data if h.get("finder_game_id") == self.cheese_id]
+        receiver_hints = [Hint(**h, is_finder=False) for h in data if h.get("receiver_game_id") == self.cheese_id and h.get("finder_game_id") != self.cheese_id]
         for hint in finder_hints:
             if hint.id not in self.finder_hints:
                 self.finder_hints[hint.id] = hint
@@ -604,10 +606,9 @@ def try_int(text: Tag | str) -> str | int:
         else:
             text = text.get_text()
     text = text.strip()
-    try:
+    if text.isnumeric():
         return int(text)
-    except ValueError:
-        return text
+    return text
 
 
 DATAPACKAGES: dict[str, "Datapackage"] = defaultdict(Datapackage)

@@ -1,20 +1,35 @@
+import datetime
 import time
 from collections import OrderedDict
 from collections.abc import ItemsView, ValuesView
 from typing import Any, Callable, Optional, Tuple, Type
 
 import attrs
+from bson import ObjectId
 import cattrs
 
 from interactions.client.utils.cache import KT, VT, TTLItem, _CacheValuesView, _CacheItemsView
 from interactions.client.mixins.serialization import DictSerializationMixin
 from pymongo.collection import Collection
 
+converter = cattrs.Converter()
+
+converter.register_structure_hook(datetime.datetime, lambda x, *_: datetime.datetime.fromisoformat(x) if x else None)
+converter.register_unstructure_hook(datetime.datetime, lambda x, *_: x.isoformat() if x else None)
+
+
+def stringify_keys(d: dict, *_) -> dict:
+    for k, v in list(d.copy().items()):
+        if isinstance(k, int):
+            d[str(k)] = v
+            del d[k]
+    return d
+
 
 def to_dict(value: Any) -> dict:
     if isinstance(value, DictSerializationMixin):
         return value.to_dict()
-    unstr = cattrs.unstructure(value)
+    unstr = converter.unstructure(value)
     if isinstance(unstr, dict):
         return unstr
     return {"_value": unstr}
@@ -24,8 +39,28 @@ def from_dict(value: dict, factory: Type[VT]) -> VT:
     if hasattr(factory, "from_dict"):
         return factory.from_dict(value)
     if "_value" in value:
-        return cattrs.structure(value["_value"], factory)
-    return cattrs.structure(value, factory)
+        return converter.structure(value["_value"], factory)
+    return converter.structure(value, factory)
+
+
+def diff_dict(new: dict, old: dict) -> dict:
+    diff = {}
+    for k, v in new.items():
+        if k not in old:
+            diff[k] = v
+        elif isinstance(v, dict) and isinstance(old[k], dict):
+            nested_diff = diff_dict(v, old[k])
+            if nested_diff:
+                diff[k] = nested_diff
+        elif isinstance(v, tuple):
+            if list(v) != list(old[k]):
+                diff[k] = v
+        elif isinstance(v, str) and isinstance(old[k], ObjectId):
+            if v != str(old[k]):
+                diff[k] = v
+        elif old[k] != v:
+            diff[k] = v
+    return diff
 
 
 @attrs.define(eq=False, order=False, hash=False, kw_only=False)
@@ -33,7 +68,7 @@ class DiffableTTLItem(TTLItem[VT]):
     initial_raw_value: dict = attrs.field(repr=False)
 
     def diff(self) -> dict:
-        return {k: v for k, v in to_dict(self.value).items() if self.initial_raw_value.get(k) != v}
+        return diff_dict(to_dict(self.value), self.initial_raw_value)
 
 
 class ExternalTTLCache(OrderedDict[KT, DiffableTTLItem[VT]]):
@@ -59,7 +94,9 @@ class ExternalTTLCache(OrderedDict[KT, DiffableTTLItem[VT]]):
             item.expire = expire
         else:
             item = DiffableTTLItem(value, expire, {})
-            self.write_to_db(key, item)
+            result = self.write_to_db(key, item)
+            if key is None and result is not None:
+                key = result
         super().__setitem__(key, item)
         self.move_to_end(key)
 
@@ -98,7 +135,9 @@ class ExternalTTLCache(OrderedDict[KT, DiffableTTLItem[VT]]):
     def values(self) -> ValuesView[VT]:
         return _CacheValuesView(self)
 
-    def items(self) -> ItemsView:
+    def items(self, with_container: bool = False) -> ItemsView:
+        if with_container:
+            return super().items()
         return _CacheItemsView(self)
 
     def _reset_expiration(self, key: KT, item: TTLItem) -> None:
@@ -139,7 +178,7 @@ class ExternalTTLCache(OrderedDict[KT, DiffableTTLItem[VT]]):
 
     def flush(self) -> None:
         """Flushes the cache."""
-        for key, item in self.items():
+        for key, item in self.items(with_container=True):
             self.write_to_db(key, item)
 
 
@@ -152,16 +191,59 @@ class MongoCache(ExternalTTLCache):
         soft_limit: int = 50,
         hard_limit: int = 250,
         on_expire: Optional[Callable] = None,
+        key_field: str = "_key",
     ) -> None:
         super().__init__(factory=factory, ttl=ttl, soft_limit=soft_limit, hard_limit=hard_limit, on_expire=on_expire)
         self.collection = collection
+        self.key_field = key_field
 
     def write_to_db(self, key, item):
-        self.collection.update_one({"_key": key}, {"$set": item.diff()}, upsert=True)
-        item.initial_raw_value = to_dict(item.value)
+        if self.key_field == "_id" and getattr(item.value, "_id", None) is None:
+            result = self.collection.insert_one({self.key_field: key, **to_dict(item.value)})
+            item.value._id = result.inserted_id  # type: ignore
+            return result.inserted_id
+
+        diff = item.diff()
+        if self.key_field in diff:
+            del diff[self.key_field]
+        if diff:
+            if not item.initial_raw_value:
+                print(f"Inserting {key} into MongoDB")
+            else:
+                print(f"Updating {key} in MongoDB with diff {diff}")
+            if self.key_field == "_id" and isinstance(key, str):
+                key = ObjectId(key)
+            self.collection.update_one({self.key_field: key}, {"$set": diff}, upsert=True)
+            item.initial_raw_value = to_dict(item.value)
 
     def load_from_db(self, key):
-        raw = self.collection.find_one({"_key": key})
+        raw = self.collection.find_one({self.key_field: key})
         if raw is None:
             return None
         return DiffableTTLItem(from_dict(raw, self.factory), time.monotonic() + self.ttl, raw)
+
+    def find(self, *args: Any, **kwargs: Any) -> list[VT]:
+        results = self.collection.find(*args, **kwargs)
+        items = []
+        for raw in results:
+            key = raw[self.key_field]
+            if isinstance(key, ObjectId):
+                key = str(key)
+            if key in self:
+                item = self.get(key, reset_expiration=True)
+            else:
+                item = DiffableTTLItem(from_dict(raw, self.factory), time.monotonic() + self.ttl, raw)
+                self[key] = item
+
+            if isinstance(item, DiffableTTLItem):
+                item = item.value
+            items.append(item)
+        return items
+
+    def delete_one(self, *args: Any, **kwargs: Any) -> None:
+        self.collection.delete_one(*args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        if hasattr(self.collection, name):
+            return getattr(self.collection, name)
+        return super().__getattr__(name)
