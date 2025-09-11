@@ -253,12 +253,9 @@ class TrackedGame:
     last_checked: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
     last_activity: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
 
-    all_items: dict[str, int] = attrs.field(factory=dict, init=False, repr=False)
-    new_items: list[NetworkItem] = attrs.field(factory=list, init=False)
-
+    all_items: dict[str, int] = attrs.field(factory=dict, repr=False)
     checks: dict[str, bool] = attrs.field(factory=dict, repr=False)
 
-    # hints: list[Hint] = attrs.field(factory=list)
     finder_hints: dict[str, Hint] = attrs.field(factory=dict, repr=False)
     receiver_hints: dict[str, Hint] = attrs.field(factory=dict, repr=False)
 
@@ -348,7 +345,6 @@ class TrackedGame:
         self.last_recieved = datetime.datetime.now(tz=datetime.UTC)
 
         self.latest_item = rows[-1][index_order]
-        self.new_items = new_items
 
         self.failures = 0
 

@@ -199,8 +199,11 @@ class MongoCache(ExternalTTLCache):
 
     def write_to_db(self, key, item):
         if self.key_field == "_id" and getattr(item.value, "_id", None) is None:
-            result = self.collection.insert_one({self.key_field: key, **to_dict(item.value)})
-            item.value._id = result.inserted_id  # type: ignore
+            diff = to_dict(item.value)
+            if "_id" in diff:
+                del diff["_id"]
+            result = self.collection.insert_one(diff)
+            item.value._id = str(result.inserted_id)
             return result.inserted_id
 
         diff = item.diff()
@@ -242,6 +245,12 @@ class MongoCache(ExternalTTLCache):
 
     def delete_one(self, *args: Any, **kwargs: Any) -> None:
         self.collection.delete_one(*args, **kwargs)
+        if self.key_field in args[0]:
+            key = args[0][self.key_field]
+            if isinstance(key, ObjectId):
+                key = str(key)
+            if key in self:
+                del self[key]
 
     def __getattr__(self, name: str) -> Any:
         if hasattr(self.collection, name):

@@ -7,6 +7,7 @@ import re
 import itertools
 
 import aiohttp
+from bson import ObjectId
 import sentry_sdk
 from interactions import (
     ActionRow,
@@ -65,8 +66,6 @@ regex_hint_filter = re.compile(r"hint_filter:(\d+|default):(-?\d+)")
 
 
 class APTracker(Extension):
-    stats: dict[str, int] = {}
-
     def __init__(self, bot: Client) -> None:
         self.bot: Client = bot
         self.old_trackers: dict[int, list[TrackedGame]] = {}
@@ -76,8 +75,12 @@ class APTracker(Extension):
         self.player_db = MongoCache(Player, db["players"], key_field="id")
         self.tracker_db = MongoCache(TrackedGame, db["trackers"], key_field="_id")
         self.trackers_by_player: dict[int, list[str]] = TTLCache()
-        self.stats = {}
+        self.stats = MongoCache(int, db["stats"], key_field="_id")
         self.load()
+
+    @listen()
+    async def on_disconnect(self) -> None:
+        self.save()
 
     def get_player_settings(self, id: int) -> Player:
         """Get the player settings for a user.  If they don't exist, create them."""
@@ -94,7 +97,11 @@ class APTracker(Extension):
     def get_trackers(self, id: int) -> list[TrackedGame]:
         """Get the trackers for a user."""
         if r := self.trackers_by_player.get(id):
-            return [self.tracker_db.get(i) for i in r]
+            tracker_list = [self.tracker_db.get(i) for i in r]
+            if None in tracker_list:
+                del self.trackers_by_player[id]
+            else:
+                return tracker_list
 
         tracker_list: list[TrackedGame] = self.tracker_db.find({"user_id": id})
         if id in self.old_trackers and self.old_trackers[id]:
@@ -224,7 +231,6 @@ class APTracker(Extension):
             if tracker.failures >= 3:
                 self.remove_tracker(ctx.author, tracker)
                 await ctx.send(f"Tracker {tracker.url} has been removed due to errors", ephemeral=ephemeral)
-                self.save()
 
         if not games:
             await ctx.send("No new items", ephemeral=True)
@@ -245,13 +251,11 @@ class APTracker(Extension):
         player = self.get_player_settings(ctx.author_id)
         player.cheese_api_key = api_key.strip()
         await ctx.send("API key saved", ephemeral=True)
-        self.save()
         try:
             cheese_dash = await player.get_trackers()
         except BadAPIKeyException:
             await ctx.send("That's not a valid API Key...  Please copy it directly from https://cheesetrackers.theincrediblewheelofchee.se/settings", ephemeral=True)
             player.cheese_api_key = None
-            self.save()
             return
 
         for multiworld in cheese_dash:
@@ -316,7 +320,6 @@ class APTracker(Extension):
                 pass
             except Forbidden:
                 pass
-            self.save()
 
     async def send_new_items(
         self,
@@ -740,17 +743,17 @@ class APTracker(Extension):
 
                 if game["checks_done"] == game["checks_total"] and game.completion_status in [CompletionStatus.done, CompletionStatus.released]:
                     # Removing needs an and, because 100% no goal can happen.
-                    self.remove_tracker(player, tracker.url)
+                    self.remove_tracker(player, tracker)
                     await player.send(f"Game {tracker.name} is complete")
                     continue
 
                 if is_mw_abandoned:
                     last_check = format_relative_time(multiworld.last_activity())
-                    self.remove_tracker(player, tracker.url)
+                    self.remove_tracker(player, tracker)
                     await player.send(f"Game {tracker.name} has stalled, the last check in the multiworld was {last_check}. Removing tracker.")
                     continue
                 elif multiworld.goaled:
-                    self.remove_tracker(player, tracker.url)
+                    self.remove_tracker(player, tracker)
                     await player.send(f"{multiworld.title} is complete, removing {tracker.name}")
                     continue
                 found_tracker = True
@@ -808,12 +811,18 @@ class APTracker(Extension):
         if player.id in self.trackers_by_player:
             del self.trackers_by_player[player.id]
         if isinstance(tracker, str):
-            self.tracker_db.delete_one({"url": tracker, "player_id": player.id})
+            self.tracker_db.delete_one({"url": tracker, "user_id": player.id})
         elif isinstance(tracker, TrackedGame):
-            self.tracker_db.delete_one({"_id": tracker._id, "player_id": player.id})
+            self.tracker_db.delete_one({"_id": ObjectId(tracker._id), "user_id": player.id})
+            tracker.disabled = True
 
     def add_tracker(self, player_id: int, tracker: TrackedGame) -> None:
+        if not tracker.url:
+            raise ValueError("Tracker must have a URL")
+        if tracker.user_id == -1:
+            tracker.user_id = player_id
         self.tracker_db[tracker._id] = tracker
+
         if player_id in self.trackers_by_player:
             self.trackers_by_player[player_id].append(tracker._id)
 
@@ -875,7 +884,7 @@ class APTracker(Extension):
                         if multiworld is None:
                             tracker.failures += 1
                             if tracker.failures >= 3:
-                                self.remove_tracker(player, tracker.url)
+                                self.remove_tracker(player, tracker)
                                 await player.send(f"Tracker {tracker.url} has been removed due to errors")
                             continue
 
@@ -898,7 +907,7 @@ class APTracker(Extension):
 
                         try:
                             if not new_items and tracker.failures > 10:
-                                self.remove_tracker(player, tracker.url)
+                                self.remove_tracker(player, tracker)
                                 await player.send(f"Tracker {tracker.url} has been removed due to errors")
                                 continue
                             if new_items:
@@ -996,11 +1005,9 @@ class APTracker(Extension):
         players = json.dumps(converter.unstructure(self.players), indent=2)
         with open("players.json", "w") as f:
             f.write(players)
-        stats = json.dumps(self.stats, indent=2)
-        with open("stats.json", "w") as f:
-            f.write(stats)
         self.player_db.flush()
         self.tracker_db.flush()
+        self.stats.flush()
 
     def load(self):
         if os.path.exists("trackers.json"):
@@ -1049,14 +1056,6 @@ class APTracker(Extension):
         try:
             for mw in self.cheese.values():
                 GAMES.update({g.id: g for g in mw.games.values()})
-        except Exception as e:
-            sentry_sdk.capture_exception(e)
-            print(e)
-        try:
-            if os.path.exists("stats.json"):
-                with open("stats.json") as f:
-                    stats = json.loads(f.read())
-                    self.stats = stats
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)

@@ -12,6 +12,9 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
+configuration.DEFAULTS["redis_uri"] = "redis://localhost"
+
+
 class Bot(interactions.Client):
     def __init__(self) -> None:
         super().__init__(
@@ -36,7 +39,7 @@ class Bot(interactions.Client):
         self.start(configuration.get("token"))
 
     async def on_ready(self) -> None:
-        self.redis = await aioredis.create_redis_pool("redis://localhost", minsize=5, maxsize=10)  # type: ignore
+        self.redis = await aioredis.create_redis_pool(configuration.get("redis_uri"), minsize=5, maxsize=10)  # type: ignore
         print("Logged in as {username} ({id})".format(username=self.user.global_name, id=self.user.id))
         print("Connected to {0}".format(", ".join([server.name for server in self.guilds])))
         print("--------")
