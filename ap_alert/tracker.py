@@ -119,7 +119,6 @@ class APTracker(Extension):
     @user_count.setter
     def user_count(self, value):
         self.stats["user_count"] = value
-        self.save()
 
     @property
     def tracker_count(self):
@@ -128,7 +127,6 @@ class APTracker(Extension):
     @tracker_count.setter
     def tracker_count(self, value):
         self.stats["tracker_count"] = value
-        self.save()
 
     @listen()
     async def on_startup(self) -> None:
@@ -177,8 +175,7 @@ class APTracker(Extension):
                     break
             else:
                 tracker = TrackedGame(url)
-                self.get_trackers(ctx.author_id).append(tracker)
-                self.save()
+                self.add_tracker(ctx.author_id, tracker)
 
             room, multiworld = await self.url_to_multiworld("/".join(url.split("/")[:-2]))
             if multiworld is None:
@@ -328,7 +325,7 @@ class APTracker(Extension):
         *,
         ephemeral: bool = False,
         inventory: bool = False,
-    ) -> Message:
+    ) -> Message | None:
         async def icon(item: NetworkItem) -> str:
             emoji = "❓"
 
@@ -369,7 +366,7 @@ class APTracker(Extension):
             await ctx_or_user.send(f"{slot_name}: {names[0]}", ephemeral=ephemeral, components=components)
         elif len(names) > 10:
             text = f"{slot_name}:\n"
-            classes = {
+            classes: dict[ItemClassification, list[NetworkItem]] = {
                 ItemClassification.mcguffin: [],
                 ItemClassification.progression: [],
                 ItemClassification.unknown: [],
@@ -397,6 +394,7 @@ class APTracker(Extension):
                 return await ctx_or_user.send(text, ephemeral=ephemeral)
         else:
             return await ctx_or_user.send(f"{slot_name}: {', '.join(names)}", ephemeral=ephemeral)
+        return None
 
     @ap.subcommand("dashboard")
     async def ap_dashboard(self, ctx: SlashContext) -> None:
@@ -729,7 +727,7 @@ class APTracker(Extension):
                         continue
 
                     tracker = TrackedGame(game["url"])
-                    self.get_trackers(player.id).append(tracker)
+                    self.add_tracker(player.id, tracker)
                     tracker.game = game["game"]
                     await self.check_for_dp(tracker)
 
@@ -814,10 +812,10 @@ class APTracker(Extension):
         elif isinstance(tracker, TrackedGame):
             self.tracker_db.delete_one({"_id": tracker._id, "player_id": player.id})
 
-    def add_tracker(self, player: User, tracker: TrackedGame) -> None:
+    def add_tracker(self, player_id: int, tracker: TrackedGame) -> None:
         self.tracker_db[tracker._id] = tracker
-        if player.id in self.trackers_by_player:
-            self.trackers_by_player[player.id].append(tracker._id)
+        if player_id in self.trackers_by_player:
+            self.trackers_by_player[player_id].append(tracker._id)
 
     def get_all_players(self) -> list[int]:
         players = []
