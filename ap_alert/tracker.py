@@ -107,8 +107,9 @@ class APTracker(Extension):
         if id in self.old_trackers and self.old_trackers[id]:
             old_tracker_list = self.old_trackers[id]
             tracker_ids = [x.cheese_id for x in tracker_list]
+            tracker_urls = [x.url for x in tracker_list]
             for t in old_tracker_list.copy():
-                if t.cheese_id not in tracker_ids:
+                if t.cheese_id not in tracker_ids and t.url not in tracker_urls:
                     t.user_id = id
                     self.tracker_db[None] = t
                     tracker_list.append(t)
