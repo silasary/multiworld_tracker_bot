@@ -814,7 +814,7 @@ class APTracker(Extension):
         if isinstance(tracker, str):
             self.tracker_db.delete_one({"url": tracker, "user_id": player.id})
         elif isinstance(tracker, TrackedGame):
-            self.tracker_db.delete_one({"_id": ObjectId(tracker._id), "user_id": player.id})
+            self.tracker_db.delete_one({"_id": ObjectId(tracker._id)})
             tracker.disabled = True
 
     def add_tracker(self, player_id: int, tracker: TrackedGame) -> None:
