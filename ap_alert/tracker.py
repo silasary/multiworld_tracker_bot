@@ -72,10 +72,10 @@ class APTracker(Extension):
         self.cheese: dict[str, Multiworld | CheeselessMultiworld] = CaseInsensitiveDict()
         self.datapackages: dict[str, Datapackage] = CaseInsensitiveDict()
         self.players: dict[int, Player] = {}
-        self.player_db = MongoCache(Player, db["players"], key_field="id")
-        self.tracker_db = MongoCache(TrackedGame, db["trackers"], key_field="_id")
+        self.player_db = MongoCache(Player, db["players"], key_field="id", hard_limit=0)
+        self.tracker_db = MongoCache(TrackedGame, db["trackers"], key_field="_id", hard_limit=0)
         self.trackers_by_player: dict[int, list[str]] = TTLCache()
-        self.stats = MongoCache(int, db["stats"], key_field="_id")
+        self.stats = MongoCache(int, db["stats"], key_field="_id", hard_limit=0)
         self.load()
 
     @listen()
