@@ -2,7 +2,7 @@ import datetime
 import enum
 import json
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 import urllib.parse
 
 import aiohttp
@@ -11,19 +11,8 @@ from collections import defaultdict
 import attrs
 from bs4 import BeautifulSoup, Tag
 
+from ap_alert.models.enums import ProgressionStatus, HintClassification, HintUpdate, TrackerStatus, CompletionStatus
 from world_data.models import Datapackage, ItemClassification
-
-if TYPE_CHECKING:
-    from enum import StrEnum as CursedStrEnum
-else:
-    from shared.cursed_enum import CursedStrEnum
-
-OldClassification = enum.Enum("OldClassification", "unknown trap filler useful progression mcguffin")
-ProgressionStatus = CursedStrEnum("ProgressionStatus", "unknown bk go soft_bk unblocked")
-HintClassification = CursedStrEnum("HintClassification", "unset critical progression qol trash unknown")
-HintUpdate = CursedStrEnum("HintUpdate", "none new found classified useless")
-TrackerStatus = CursedStrEnum("TrackerStatus", "unknown disconnected connected ready playing goal_completed")
-CompletionStatus = CursedStrEnum("CompletionStatus", "unknown incomplete all_checks goal done released")
 
 
 @attrs.define()
