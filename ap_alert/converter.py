@@ -1,7 +1,7 @@
 import datetime
 import cattrs
 
-from ap_alert.multiworld import CheeselessMultiworld, Multiworld
+from ap_alert.multiworld import Multiworld
 
 
 converter = cattrs.Converter()
@@ -14,7 +14,7 @@ def structure_multiworld(x, *_):
     if x["url"].startswith("https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/"):
         return converter.structure(x, Multiworld)
 
-    return converter.structure(x, CheeselessMultiworld)
+    return converter.structure(x, Multiworld)
 
 
-converter.register_structure_hook(Multiworld | CheeselessMultiworld, structure_multiworld)
+converter.register_structure_hook(Multiworld, structure_multiworld)

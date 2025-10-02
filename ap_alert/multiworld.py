@@ -202,13 +202,14 @@ class Player:
     cheese_api_key: str | None = None
     default_filters: Filters = Filters.unset
     default_hint_filters: HintFilters = HintFilters.unset
+    quiet_mode: bool = False
 
     @property
     def mention(self) -> str:
         return f"<@{self.id}>"
 
     def __str__(self) -> str:
-        return f"{self.name}#{self.discriminator}"
+        return self.name if self.name else self.mention
 
     async def get_trackers(self) -> list["Multiworld"]:
         async with aiohttp.ClientSession() as session:
@@ -220,8 +221,8 @@ class Player:
         value = []
         for tracker in data:
             url = f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{tracker['tracker_id']}"
-            if MULTIWORLDS.get(tracker["tracker_id"]) is not None:
-                value.append(MULTIWORLDS[tracker["tracker_id"]])
+            if MULTIWORLDS_BY_CHEESE.get(tracker["tracker_id"]) is not None:
+                value.append(MULTIWORLDS_BY_CHEESE[tracker["tracker_id"]])
             else:
                 value.append(Multiworld(url))
         return value
@@ -464,8 +465,11 @@ class TrackedGame:
 
 @attrs.define()
 class Multiworld:
-    url: str  # https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/room_id
+    url: str
+    cheese_url: str | None = None
     tracker_id: str | None = None
+    ap_tracker_id: str | None = None
+    cheese_tracker_id: str | None = None
     title: str | None = None
     games: dict[int, CheeseGame] = attrs.field(factory=dict)
     last_refreshed: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
@@ -474,33 +478,32 @@ class Multiworld:
     room_link: str | None = None
     last_port: Optional[int] = None
     hints: list[dict] | None = attrs.field(factory=list)
+    player_checks_done: list[dict] = attrs.field(factory=list)
+    player_items_received: list[dict] = attrs.field(factory=list)
+
+    static_tracker_data: dict | None = None
+    slot_data: list[dict] | None = None
+
+    agents: dict[str, "BaseAgent"] = attrs.field(factory=dict, repr=False, init=False)
 
     async def refresh(self, force: bool = False) -> None:
-        if (
-            self.last_refreshed
-            and self.last_refreshed.tzinfo is not None
-            and datetime.datetime.now(tz=datetime.UTC) - self.last_refreshed < datetime.timedelta(hours=1)
-            and not force
-        ):
-            return
         self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
 
-        logging.info(f"Refreshing {self.url}")
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.url) as response:
-                txt = await response.text()
-        # data = requests.get(self.url).text
-        data = json.loads(txt)
-        self.tracker_id = data.get("tracker_id")
-        self.title = data.get("title", self.title)
-        self.games = {g["position"]: CheeseGame(g) for g in data.get("games")}
-        GAMES.update({g.id: g for g in self.games.values()})
-        MULTIWORLDS[self.tracker_id] = self
-        self.last_update = datetime.datetime.fromisoformat(data.get("updated_at"))
-        self.upstream_url = data.get("upstream_url")
-        self.room_link = data.get("room_link")
-        self.last_port = data.get("last_port")
-        self.hints = data.get("hints", [])
+        if "cheese" not in self.agents:
+            self.agents["cheese"] = CheeseAgent(self)
+        await self.agents["cheese"].refresh(force)
+        if "api" not in self.agents:
+            self.agents["api"] = ApiTrackerAgent(self)
+        await self.agents["api"].refresh(force)
+        if not self.agents["cheese"].enabled and not self.agents["api"].enabled:
+            if "webtracker" not in self.agents:
+                self.agents["webtracker"] = WebTrackerAgent(self)
+            await self.agents["webtracker"].refresh(force)
+
+        if self.cheese_tracker_id is not None and MULTIWORLDS_BY_CHEESE.get(self.cheese_tracker_id) is not self:
+            MULTIWORLDS_BY_CHEESE[self.cheese_tracker_id] = self
+        if self.ap_tracker_id is not None and MULTIWORLDS_BY_AP.get(self.ap_tracker_id) is not self:
+            MULTIWORLDS_BY_AP[self.ap_tracker_id] = self
 
     def last_activity(self) -> datetime.datetime:
         """
@@ -550,19 +553,84 @@ class Multiworld:
         return "https"
 
 
-@attrs.define()
-class CheeselessMultiworld(Multiworld):
-    async def refresh(self, force: bool = False) -> None:
+class BaseAgent:
+    mw: Multiworld
+    enabled: bool = True
+    last_refreshed: datetime.datetime = datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")
+
+    def __init__(self, mw: Multiworld) -> None:
+        self.mw = mw
+
+    def rate_limit(self, min_interval: datetime.timedelta, force: bool) -> bool:
+        if not self.enabled:
+            return True
+        if force:
+            self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
+            return False
+        if self.last_refreshed and datetime.datetime.now(tz=datetime.UTC) - self.last_refreshed < min_interval:
+            return True
         self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
-        if self.upstream_url is None:
-            self.upstream_url = self.url
-        if self.games is None:
-            self.games = {}
-        if self.room_link == "None":
-            self.room_link = None
-        self.tracker_id = self.url.split("/")[-1]
-        logging.info(f"Refreshing cheeseless {self.url}")
-        multitracker_url = self.url
+        return False
+
+    async def refresh(self, force: bool = False) -> None:
+        raise NotImplementedError()
+
+
+class CheeseAgent(BaseAgent):
+    async def refresh(self, force: bool = False) -> None:
+        if self.rate_limit(datetime.timedelta(hours=1), force):
+            return
+
+        if self.mw.cheese_url is None:
+            if self.mw.url.startswith("https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/"):
+                self.mw.cheese_url = self.mw.url
+            else:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
+                        json={"url": self.mw.url},
+                    ) as response:
+                        if response.status in [400, 404, 403]:
+                            self.enabled = False
+                            return
+                        ch_id = (await response.json()).get("tracker_id")
+                self.mw.cheese_url = f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}"
+
+        logging.info(f"Refreshing {self.mw.cheese_url}")
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self.mw.cheese_url) as response:
+                txt = await response.text()
+        # data = requests.get(self.url).text
+        data = json.loads(txt)
+        self.mw.cheese_tracker_id = data.get("tracker_id")
+        self.mw.title = data.get("title", self.mw.title)
+        self.mw.games = {g["position"]: CheeseGame(g) for g in data.get("games")}
+        GAMES.update({g.id: g for g in self.mw.games.values()})
+        self.mw.last_update = datetime.datetime.fromisoformat(data.get("updated_at"))
+        self.mw.upstream_url = data.get("upstream_url")
+        self.mw.room_link = data.get("room_link")
+        self.mw.last_port = data.get("last_port")
+        self.mw.hints = data.get("hints", [])
+
+        if self.mw.url.startswith("https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/") and self.mw.upstream_url is not None:
+            self.mw.url = self.mw.upstream_url
+
+
+class WebTrackerAgent(BaseAgent):
+    async def refresh(self, force: bool = False) -> None:
+        if self.rate_limit(datetime.timedelta(hours=1), force):
+            return
+
+        self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
+        if self.mw.upstream_url is None:
+            self.mw.upstream_url = self.mw.url
+        if self.mw.games is None:
+            self.mw.games = {}
+        if self.mw.room_link == "None":
+            self.mw.room_link = None
+        self.mw.ap_tracker_id = self.mw.url.split("/")[-1]
+        logging.info(f"Refreshing cheeseless {self.mw.url}")
+        multitracker_url = self.mw.url
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(multitracker_url) as response:
@@ -570,11 +638,12 @@ class CheeselessMultiworld(Multiworld):
                         return
                     html = await response.text()
             except aiohttp.ClientConnectorError as e:
-                logging.error(f"Connection error occurred while processing tracker {self.url}: {e}")
+                logging.error(f"Connection error occurred while processing tracker {self.mw.url}: {e}")
                 return
         soup = BeautifulSoup(html, features="html.parser")
         title = soup.find("title").string
         if title == "Page Not Found (404)":
+            self.enabled = False
             return
         slots = process_table(soup.find(id="checks-table"))
         for slot in slots:
@@ -588,11 +657,45 @@ class CheeselessMultiworld(Multiworld):
             else:
                 last_activity = datetime.datetime.fromisoformat(slot.get("Last Activity", "1970-01-01T00:00:00Z"))
 
-            if slot_id not in self.games:
-                self.games[slot_id] = CheeseGame({"name": slot["Name"], "game": slot["Game"], "position": int(slot_id)})
-            self.games[slot_id].update({"game": slot["Game"], "last_activity": last_activity.isoformat(), "checks_done": int(checks_done), "checks_total": int(checks_total)})
+            if slot_id not in self.mw.games:
+                self.mw.games[slot_id] = CheeseGame({"name": slot["Name"], "game": slot["Game"], "position": int(slot_id)})
+            self.mw.games[slot_id].update({"game": slot["Game"], "last_activity": last_activity.isoformat(), "checks_done": int(checks_done), "checks_total": int(checks_total)})
 
-        self.last_update = max(g.last_activity for g in self.games.values())
+        self.mw.last_update = max(g.last_activity for g in self.mw.games.values())
+
+
+class ApiTrackerAgent(BaseAgent):
+    async def refresh(self, force: bool = False) -> None:
+        if self.rate_limit(datetime.timedelta(hours=1), force):
+            return
+
+        if self.mw.ap_tracker_id is None:
+            self.mw.ap_tracker_id = self.mw.url.split("/")[-1]
+
+        logging.info(f"Refreshing API multiworld {self.mw.url}")
+        async with aiohttp.ClientSession() as session:
+            if self.mw.static_tracker_data is None:
+                static_url = f"{self.mw.ap_scheme}://{self.mw.ap_hostname}/api/static_tracker/{self.mw.ap_tracker_id}"
+                async with session.get(static_url) as response:
+                    if response.status != 200:
+                        self.enabled = False
+                        return
+                    self.mw.static_tracker_data = await response.json()
+            if self.mw.slot_data is None:
+                slot_url = f"{self.mw.ap_scheme}://{self.mw.ap_hostname}/api/slot_data_tracker/{self.mw.ap_tracker_id}"
+                async with session.get(slot_url) as response:
+                    if response.status != 200:
+                        self.enabled = False
+                        return
+                    self.mw.slot_data = await response.json()
+            api_url = f"{self.mw.ap_scheme}://{self.mw.ap_hostname}/api/tracker/{self.mw.ap_tracker_id}"
+            async with session.get(api_url) as response:
+                if response.status != 200:
+                    self.enabled = False
+                    return
+                data = await response.json()
+        self.mw.player_checks_done = data.get("player_checks_done", [])
+        self.mw.player_items_received = data.get("player_items_received", [])
 
 
 def process_table(table: Tag) -> list[dict]:
@@ -616,4 +719,5 @@ def try_int(text: Tag | str) -> str | int:
 
 DATAPACKAGES: dict[str, "Datapackage"] = defaultdict(Datapackage)
 GAMES: dict[int, CheeseGame] = {}
-MULTIWORLDS: dict[str, Multiworld] = {}
+MULTIWORLDS_BY_CHEESE: dict[str, Multiworld] = {}
+MULTIWORLDS_BY_AP: dict[str, Multiworld] = {}
