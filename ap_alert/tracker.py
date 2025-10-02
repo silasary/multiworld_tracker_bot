@@ -7,7 +7,6 @@ import os
 import re
 import itertools
 
-import aiohttp
 import sentry_sdk
 from interactions import (
     ActionRow,
@@ -729,7 +728,7 @@ class APTracker(Extension):
 
         return multiworld, found_tracker
 
-    async def url_to_multiworld(self, room) -> tuple[str, Multiworld]:
+    async def url_to_multiworld(self, room: str) -> tuple[str, Multiworld]:
         if isinstance(room, Multiworld):
             multiworld = room
             if multiworld.upstream_url is None:
@@ -754,18 +753,11 @@ class APTracker(Extension):
                 ap_url = f"https://archipelago.gg/tracker/{room}"
             if "generic_tracker" in ap_url:
                 ap_url = ap_url.replace("generic_tracker", "tracker")
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
-                    json={"url": ap_url},
-                ) as response:
-                    if response.status in [400, 404]:
-                        return room, None
-                    ch_id = (await response.json()).get("tracker_id")
 
-            multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
+            multiworld = Multiworld(ap_url)
             if not multiworld.title:
                 multiworld.title = room
+
         return room, multiworld
 
     def remove_tracker(self, player, tracker: str | TrackedGame) -> None:
