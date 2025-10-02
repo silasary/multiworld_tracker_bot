@@ -190,7 +190,8 @@ class APTracker(Extension):
 
         games = {}
         for tracker in self.get_trackers(ctx.author_id).copy():
-            new_items = await tracker.refresh()
+            _room, multiworld = await self.url_to_multiworld(tracker.multitracker_url)
+            new_items = await multiworld.refresh_game(tracker)
             if new_items:
                 games[tracker] = tracker.notification_queue.copy()
             if tracker.failures >= 3:
@@ -297,27 +298,28 @@ class APTracker(Extension):
         *,
         ephemeral: bool = False,
         inventory: bool = False,
-    ) -> Message:
+    ) -> Message | None:
         async def icon(item: NetworkItem) -> str:
             emoji = "❓"
 
-            if tracker.game in self.datapackages:
+            classification = item.classification
+            if classification == ItemClassification.unknown and tracker.game in self.datapackages:
                 classification = self.datapackages[tracker.game].items.setdefault(item.name, ItemClassification.unknown)
-                if inventory and classification == ItemClassification.unknown:
-                    await self.try_classify(ctx_or_user, tracker, new_items)
-                    classification = self.datapackages[tracker.game].items[item.name]
-                if classification == ItemClassification.mcguffin:
-                    emoji = "✨"
-                if classification == ItemClassification.filler:
-                    emoji = "<:filler:1277502385459171338>"
-                if classification == ItemClassification.useful:
-                    emoji = "<:useful:1277502389729103913>"
-                if classification == ItemClassification.progression:
-                    emoji = "<:progression:1277502382682542143>"
-                if classification == ItemClassification.trap:
-                    emoji = "❌"
+            if inventory and classification == ItemClassification.unknown:
+                await self.try_classify(ctx_or_user, tracker, new_items)
+                classification = self.datapackages[tracker.game].items[item.name]
+            if classification == ItemClassification.mcguffin:
+                emoji = "✨"
+            if classification == ItemClassification.filler:
+                emoji = "<:filler:1277502385459171338>"
+            if classification == ItemClassification.useful:
+                emoji = "<:useful:1277502389729103913>"
+            if classification == ItemClassification.progression:
+                emoji = "<:progression:1277502382682542143>"
+            if classification == ItemClassification.trap:
+                emoji = "❌"
 
-            if inventory:
+            if inventory or item.quantity > 1:
                 return f"{emoji} {item.name} x{item.quantity}"
             return f"{emoji} {item.name}"
 
@@ -338,7 +340,7 @@ class APTracker(Extension):
             await ctx_or_user.send(f"{slot_name}: {names[0]}", ephemeral=ephemeral, components=components)
         elif len(names) > 10:
             text = f"{slot_name}:\n"
-            classes = {
+            classes: dict[ItemClassification, list[NetworkItem]] = {
                 ItemClassification.mcguffin: [],
                 ItemClassification.progression: [],
                 ItemClassification.unknown: [],
@@ -366,6 +368,7 @@ class APTracker(Extension):
                 return await ctx_or_user.send(text, ephemeral=ephemeral)
         else:
             return await ctx_or_user.send(f"{slot_name}: {', '.join(names)}", ephemeral=ephemeral)
+        return None
 
     @ap.subcommand("dashboard")
     async def ap_dashboard(self, ctx: SlashContext) -> None:
@@ -530,7 +533,8 @@ class APTracker(Extension):
         if tracker is None:
             return
         if not tracker.all_items:
-            await tracker.refresh()
+            _room, multiworld = await self.url_to_multiworld(tracker.multitracker_url)
+            await multiworld.refresh_game(tracker)
         await self.send_new_items(ctx, tracker, ephemeral=True, inventory=True)
 
     @component_callback(regex_settings)
@@ -842,7 +846,7 @@ class APTracker(Extension):
                             should_check = False
 
                         if should_check:
-                            new_items = await tracker.refresh()
+                            new_items = await multiworld.refresh_game(tracker)
                         else:
                             new_items = False
 
@@ -885,12 +889,7 @@ class APTracker(Extension):
                         games[tracker.game] = games.get(tracker.game, 0) + 1
                         if should_check:
                             # if we didn't check anything, we don't need to wait
-                            if self.tracker_count > 3000:
-                                await asyncio.sleep(1)  # We're popular
-                            elif self.tracker_count > 720:
-                                await asyncio.sleep(3)  # three doesn't go into 3600 evenly, so overflows will be spread out
-                            else:
-                                await asyncio.sleep(5)
+                            await asyncio.sleep(1)  # We're popular
                         else:
                             await asyncio.sleep(0)
                     except Exception as e:
