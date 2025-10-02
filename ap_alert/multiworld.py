@@ -661,8 +661,8 @@ class ApiTrackerAgent(BaseAgent):
         for index, i in enumerate(api_items, start=0):
             if index > slot.latest_item:
                 item_id = i[0]
-                i[1]
-                i[2]
+                #  location = i[1]
+                #  sender = i[2]
                 flags = i[3] if len(i) > 3 else 0
 
                 item_name = ap_datapackage["item_id_to_name"].get(item_id, str(item_id))
