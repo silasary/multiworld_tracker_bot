@@ -6,13 +6,11 @@ from typing import TYPE_CHECKING, Optional
 import urllib.parse
 
 import aiohttp
-import interactions
 from collections import defaultdict
 
 import attrs
 from bs4 import BeautifulSoup, Tag
 
-from shared.exceptions import BadAPIKeyException
 from world_data.models import Datapackage, ItemClassification
 
 if TYPE_CHECKING:
@@ -130,33 +128,6 @@ class NetworkItem:
         return DATAPACKAGES[self.game].items.get(self.name, ItemClassification.unknown)
 
 
-# @attrs.define()
-# class Datapackage:
-#     items: dict[str, ItemClassification] = attrs.field(factory=dict)
-#     categories: dict[str, ItemClassification] = attrs.field(factory=dict)
-
-#     def icon(self, item_name: str) -> str:
-#         classification = self.items.get(item_name, ItemClassification.unknown)
-#         emoji = "❓"
-#         if classification == ItemClassification.mcguffin:
-#             emoji = "✨"
-#         if classification == ItemClassification.filler:
-#             emoji = "<:filler:1277502385459171338>"
-#         if classification == ItemClassification.useful:
-#             emoji = "<:useful:1277502389729103913>"
-#         if classification == ItemClassification.progression:
-#             emoji = "<:progression:1277502382682542143>"
-#         if classification == ItemClassification.trap:
-#             emoji = "❌"
-#         return emoji
-
-#     def set_classification(self, item_name: str, classification: ItemClassification) -> None:
-#         if classification == ItemClassification.unknown and self.items.get(item_name, ItemClassification.unknown) != ItemClassification.unknown:
-#             # We don't want to set an item to unknown if it's already classified
-#             return
-#         self.items[item_name] = classification
-
-
 class CheeseGame(dict):
     @property
     def id(self) -> int:
@@ -192,43 +163,6 @@ class CheeseGame(dict):
     @property
     def name(self) -> str:
         return self.get("name", self.get("position", "Unknown"))
-
-
-@attrs.define()
-class Player:
-    id: int
-    name: str = None
-
-    cheese_api_key: str | None = None
-    default_filters: Filters = Filters.unset
-    default_hint_filters: HintFilters = HintFilters.unset
-    quiet_mode: bool = False
-
-    @property
-    def mention(self) -> str:
-        return f"<@{self.id}>"
-
-    def __str__(self) -> str:
-        return self.name if self.name else self.mention
-
-    async def get_trackers(self) -> list["Multiworld"]:
-        async with aiohttp.ClientSession() as session:
-            headers = {"Authorization": f"Bearer {self.cheese_api_key}"} if self.cheese_api_key else {}
-            async with session.get("https://cheesetrackers.theincrediblewheelofchee.se/api/dashboard/tracker", headers=headers) as response:
-                if response.status == 401:
-                    raise BadAPIKeyException("Invalid API key.")
-                data = await response.json()
-        value = []
-        for tracker in data:
-            url = f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{tracker['tracker_id']}"
-            if MULTIWORLDS_BY_CHEESE.get(tracker["tracker_id"]) is not None:
-                value.append(MULTIWORLDS_BY_CHEESE[tracker["tracker_id"]])
-            else:
-                value.append(Multiworld(url))
-        return value
-
-    def update(self, user: interactions.User) -> None:
-        self.name = user.global_name
 
 
 @attrs.define()

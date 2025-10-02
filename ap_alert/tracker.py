@@ -30,6 +30,7 @@ from interactions.models.internal.application_commands import OptionType, integr
 from interactions.models.internal.tasks import IntervalTrigger, Task
 from requests.structures import CaseInsensitiveDict
 
+from .models.player import Player
 from ap_alert.converter import converter
 from shared.exceptions import BadAPIKeyException
 
@@ -42,7 +43,6 @@ from .multiworld import (
     ItemClassification,
     Multiworld,
     NetworkItem,
-    Player,
     ProgressionStatus,
     TrackedGame,
     CompletionStatus,
