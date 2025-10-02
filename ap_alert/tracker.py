@@ -102,6 +102,9 @@ class APTracker(Extension):
     @listen()
     async def on_startup(self) -> None:
         await external_data.load_all(self.datapackages)
+        for _user, trackers in self.trackers.items():
+            for tracker in trackers:
+                await self.check_for_dp(tracker)
         self.refresh_all.start()
         self.refresh_all.trigger.last_call_time = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=1)
         external_data.update_datapackage.start()
