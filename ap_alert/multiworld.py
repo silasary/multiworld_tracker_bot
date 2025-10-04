@@ -489,6 +489,10 @@ class WebTrackerAgent(BaseAgent):
             except aiohttp.ClientConnectorError as e:
                 logging.error(f"Connection error occurred while processing tracker {self.mw.url}: {e}")
                 return
+            except aiohttp.ConnectionTimeoutError as e:
+                logging.error(f"Connection timeout error occurred while processing tracker {self.mw.url}: {e}")
+                self.enabled = False
+                return
         soup = BeautifulSoup(html, features="html.parser")
         title = soup.find("title").string
         if title == "Page Not Found (404)":
