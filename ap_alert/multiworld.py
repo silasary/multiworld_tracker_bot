@@ -2,30 +2,18 @@ import datetime
 import enum
 import json
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 import urllib.parse
 
 import aiohttp
-import interactions
 from collections import defaultdict
 
 import attrs
 from bs4 import BeautifulSoup, Tag
 
-from shared.exceptions import BadAPIKeyException
+from ap_alert.models.enums import ProgressionStatus, HintClassification, HintUpdate, TrackerStatus, CompletionStatus
+from archipelagopy.netutils import fetch_datapackage_from_webhost
 from world_data.models import Datapackage, ItemClassification
-
-if TYPE_CHECKING:
-    from enum import StrEnum as CursedStrEnum
-else:
-    from shared.cursed_enum import CursedStrEnum
-
-OldClassification = enum.Enum("OldClassification", "unknown trap filler useful progression mcguffin")
-ProgressionStatus = CursedStrEnum("ProgressionStatus", "unknown bk go soft_bk unblocked")
-HintClassification = CursedStrEnum("HintClassification", "unset critical progression qol trash unknown")
-HintUpdate = CursedStrEnum("HintUpdate", "none new found classified useless")
-TrackerStatus = CursedStrEnum("TrackerStatus", "unknown disconnected connected ready playing goal_completed")
-CompletionStatus = CursedStrEnum("CompletionStatus", "unknown incomplete all_checks goal done released")
 
 
 @attrs.define()
@@ -124,37 +112,13 @@ class NetworkItem:
     name: str
     game: str
     quantity: int
+    flags: ItemClassification = ItemClassification.unknown
 
     @property
     def classification(self) -> ItemClassification:
+        if self.flags != ItemClassification.unknown:
+            return self.flags
         return DATAPACKAGES[self.game].items.get(self.name, ItemClassification.unknown)
-
-
-# @attrs.define()
-# class Datapackage:
-#     items: dict[str, ItemClassification] = attrs.field(factory=dict)
-#     categories: dict[str, ItemClassification] = attrs.field(factory=dict)
-
-#     def icon(self, item_name: str) -> str:
-#         classification = self.items.get(item_name, ItemClassification.unknown)
-#         emoji = "❓"
-#         if classification == ItemClassification.mcguffin:
-#             emoji = "✨"
-#         if classification == ItemClassification.filler:
-#             emoji = "<:filler:1277502385459171338>"
-#         if classification == ItemClassification.useful:
-#             emoji = "<:useful:1277502389729103913>"
-#         if classification == ItemClassification.progression:
-#             emoji = "<:progression:1277502382682542143>"
-#         if classification == ItemClassification.trap:
-#             emoji = "❌"
-#         return emoji
-
-#     def set_classification(self, item_name: str, classification: ItemClassification) -> None:
-#         if classification == ItemClassification.unknown and self.items.get(item_name, ItemClassification.unknown) != ItemClassification.unknown:
-#             # We don't want to set an item to unknown if it's already classified
-#             return
-#         self.items[item_name] = classification
 
 
 class CheeseGame(dict):
@@ -192,42 +156,6 @@ class CheeseGame(dict):
     @property
     def name(self) -> str:
         return self.get("name", self.get("position", "Unknown"))
-
-
-@attrs.define()
-class Player:
-    id: int
-    name: str = None
-
-    cheese_api_key: str | None = None
-    default_filters: Filters = Filters.unset
-    default_hint_filters: HintFilters = HintFilters.unset
-
-    @property
-    def mention(self) -> str:
-        return f"<@{self.id}>"
-
-    def __str__(self) -> str:
-        return f"{self.name}#{self.discriminator}"
-
-    async def get_trackers(self) -> list["Multiworld"]:
-        async with aiohttp.ClientSession() as session:
-            headers = {"Authorization": f"Bearer {self.cheese_api_key}"} if self.cheese_api_key else {}
-            async with session.get("https://cheesetrackers.theincrediblewheelofchee.se/api/dashboard/tracker", headers=headers) as response:
-                if response.status == 401:
-                    raise BadAPIKeyException("Invalid API key.")
-                data = await response.json()
-        value = []
-        for tracker in data:
-            url = f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{tracker['tracker_id']}"
-            if MULTIWORLDS.get(tracker["tracker_id"]) is not None:
-                value.append(MULTIWORLDS[tracker["tracker_id"]])
-            else:
-                value.append(Multiworld(url))
-        return value
-
-    def update(self, user: interactions.User) -> None:
-        self.name = user.global_name
 
 
 @attrs.define()
@@ -273,97 +201,6 @@ class TrackedGame:
     @property
     def slot_id(self) -> int:
         return int(self.url.split("/")[-1])
-
-    async def refresh(self) -> bool:
-        if self.game is None or self.game == "None":
-            await self.refresh_metadata()
-        logging.info(f"Refreshing {self.url}")
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(self.url) as response:
-                    if response.status == 500 and "/tracker/" in self.url:
-                        self.url = self.url.replace("/tracker/", "/generic_tracker/")
-                        return await self.refresh()
-
-                    if response.status != 200:
-                        self.failures += 1
-                        return False
-                    html = await response.text()
-        except aiohttp.InvalidUrlClientError:
-            # This is a bad URL, don't try again
-            self.failures = 100
-            return []
-        except aiohttp.ClientConnectorError as e:
-            logging.error(f"Connection error occurred while processing tracker {self.url}: {e}")
-            self.failures += 1
-            return False
-        except aiohttp.ConnectionTimeoutError as e:
-            logging.error(f"Connection timeout error occurred while processing tracker {self.url}: {e}")
-            self.failures += 1
-            return False
-        # html = requests.get(self.url).content
-        soup = BeautifulSoup(html, features="html.parser")
-        title = soup.find("title").string
-        if title == "Page Not Found (404)":
-            self.failures += 1
-            return False
-        recieved = soup.find(id="received-table")
-        if recieved is None:
-            if "/tracker/" in self.url:
-                self.url = self.url.replace("/tracker/", "/generic_tracker/")
-                return await self.refresh()
-        # headers = [i.string for i in recieved.find_all("th")]
-        # rows = [[try_int(i.string) for i in r.find_all("td")] for r in recieved.find_all("tr")[1:]]
-        self.process_locations(soup.find(id="locations-table"))
-        rows = process_table(recieved)
-        self.last_refresh = datetime.datetime.now(tz=datetime.timezone.utc)
-        if not rows:
-            return False
-
-        index_order = "Last Order Received"
-        index_amount = "Amount"
-        index_item = "Item"
-
-        rows.sort(key=lambda r: r[index_order])
-        if rows[-1][index_order] < self.latest_item:
-            self.latest_item = -1
-            return False
-        is_up_to_date = rows[-1][index_order] == self.latest_item
-        if is_up_to_date and self.all_items:
-            return False
-
-        new_items: list[NetworkItem] = []
-        for r in rows:
-            self.all_items[r[index_item]] = r[index_amount]
-            if r[index_order] > self.latest_item:
-                item = NetworkItem(r[index_item], self.game, r[index_amount])
-                new_items.append(item)
-                if DATAPACKAGES.get(self.game) is not None:
-                    classification = DATAPACKAGES[self.game].items.setdefault(r[index_item], ItemClassification.unknown)
-                    if classification in [ItemClassification.progression, ItemClassification.mcguffin]:
-                        self.last_progression = (r[index_item], datetime.datetime.now(tz=datetime.UTC))
-
-        if is_up_to_date:
-            return False
-
-        self.last_item = (rows[-1][index_item], datetime.datetime.now(tz=datetime.UTC))
-        self.last_recieved = datetime.datetime.now(tz=datetime.UTC)
-
-        self.latest_item = rows[-1][index_order]
-        self.new_items = new_items
-
-        self.failures = 0
-
-        if self.filters == Filters.none:
-            return False
-        if self.filters in [Filters.unset, Filters.everything]:
-            self.notification_queue.extend(new_items)
-            return True
-
-        new_items = [i for i in new_items if i.classification in [ItemClassification.unknown, ItemClassification.bad_name] or self.filters & Filters(i.classification.value)]
-
-        self.notification_queue.extend(new_items)
-        return bool(new_items)
 
     async def refresh_metadata(self) -> None:
         logging.info(f"Refreshing metadata for {self.url}")
@@ -464,8 +301,11 @@ class TrackedGame:
 
 @attrs.define()
 class Multiworld:
-    url: str  # https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/room_id
+    url: str
+    cheese_url: str | None = None
     tracker_id: str | None = None
+    ap_tracker_id: str | None = None
+    cheese_tracker_id: str | None = None
     title: str | None = None
     games: dict[int, CheeseGame] = attrs.field(factory=dict)
     last_refreshed: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
@@ -474,33 +314,42 @@ class Multiworld:
     room_link: str | None = None
     last_port: Optional[int] = None
     hints: list[dict] | None = attrs.field(factory=list)
+    player_checks_done: list[dict] = attrs.field(factory=list)
+    player_items_received: list[dict] = attrs.field(factory=list)
+
+    static_tracker_data: dict | None = None
+    slot_data: list[dict] | None = None
+
+    agents: dict[str, "BaseAgent"] = attrs.field(factory=dict, repr=False, init=False)
 
     async def refresh(self, force: bool = False) -> None:
-        if (
-            self.last_refreshed
-            and self.last_refreshed.tzinfo is not None
-            and datetime.datetime.now(tz=datetime.UTC) - self.last_refreshed < datetime.timedelta(hours=1)
-            and not force
-        ):
-            return
         self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
 
-        logging.info(f"Refreshing {self.url}")
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.url) as response:
-                txt = await response.text()
-        # data = requests.get(self.url).text
-        data = json.loads(txt)
-        self.tracker_id = data.get("tracker_id")
-        self.title = data.get("title", self.title)
-        self.games = {g["position"]: CheeseGame(g) for g in data.get("games")}
-        GAMES.update({g.id: g for g in self.games.values()})
-        MULTIWORLDS[self.tracker_id] = self
-        self.last_update = datetime.datetime.fromisoformat(data.get("updated_at"))
-        self.upstream_url = data.get("upstream_url")
-        self.room_link = data.get("room_link")
-        self.last_port = data.get("last_port")
-        self.hints = data.get("hints", [])
+        if "cheese" not in self.agents:
+            self.agents["cheese"] = CheeseAgent(self)
+        await self.agents["cheese"].refresh(force)
+        if "api" not in self.agents:
+            self.agents["api"] = ApiTrackerAgent(self)
+        await self.agents["api"].refresh(force)
+        if not self.agents["cheese"].enabled and not self.agents["api"].enabled:
+            if "webtracker" not in self.agents:
+                self.agents["webtracker"] = WebTrackerAgent(self)
+            await self.agents["webtracker"].refresh(force)
+
+        if self.cheese_tracker_id is not None and MULTIWORLDS_BY_CHEESE.get(self.cheese_tracker_id) is not self:
+            MULTIWORLDS_BY_CHEESE[self.cheese_tracker_id] = self
+        if self.ap_tracker_id is not None and MULTIWORLDS_BY_AP.get(self.ap_tracker_id) is not self:
+            MULTIWORLDS_BY_AP[self.ap_tracker_id] = self
+
+    async def refresh_game(self, slot: TrackedGame) -> bool:
+        if "api" in self.agents and self.agents["api"].enabled:
+            return await self.agents["api"].refresh_game(slot)
+
+        if "webtracker" not in self.agents:
+            self.agents["webtracker"] = WebTrackerAgent(self)
+        if self.agents["webtracker"].enabled:
+            return await self.agents["webtracker"].refresh_game(slot)
+        return False
 
     def last_activity(self) -> datetime.datetime:
         """
@@ -550,19 +399,87 @@ class Multiworld:
         return "https"
 
 
-@attrs.define()
-class CheeselessMultiworld(Multiworld):
-    async def refresh(self, force: bool = False) -> None:
+class BaseAgent:
+    mw: Multiworld
+    enabled: bool = True
+    last_refreshed: datetime.datetime = datetime.datetime.fromisoformat("1970-01-01T00:00:00Z")
+
+    def __init__(self, mw: Multiworld) -> None:
+        self.mw = mw
+
+    def rate_limit(self, min_interval: datetime.timedelta, force: bool) -> bool:
+        if not self.enabled:
+            return True
+        if force:
+            self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
+            return False
+        if self.last_refreshed and datetime.datetime.now(tz=datetime.UTC) - self.last_refreshed < min_interval:
+            return True
         self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
-        if self.upstream_url is None:
-            self.upstream_url = self.url
-        if self.games is None:
-            self.games = {}
-        if self.room_link == "None":
-            self.room_link = None
-        self.tracker_id = self.url.split("/")[-1]
-        logging.info(f"Refreshing cheeseless {self.url}")
-        multitracker_url = self.url
+        return False
+
+    async def refresh(self, force: bool = False) -> None:
+        raise NotImplementedError()
+
+    async def refresh_game(self, slot: TrackedGame) -> bool:
+        raise NotImplementedError()
+
+
+class CheeseAgent(BaseAgent):
+    async def refresh(self, force: bool = False) -> None:
+        if self.rate_limit(datetime.timedelta(hours=1), force):
+            return
+
+        if self.mw.cheese_url is None:
+            if self.mw.url.startswith("https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/"):
+                self.mw.cheese_url = self.mw.url
+            else:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
+                        json={"url": self.mw.url},
+                    ) as response:
+                        if response.status in [400, 404, 403]:
+                            self.enabled = False
+                            return
+                        ch_id = (await response.json()).get("tracker_id")
+                self.mw.cheese_url = f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}"
+
+        logging.info(f"Refreshing {self.mw.cheese_url}")
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self.mw.cheese_url) as response:
+                txt = await response.text()
+        # data = requests.get(self.url).text
+        data = json.loads(txt)
+        self.mw.cheese_tracker_id = data.get("tracker_id")
+        self.mw.title = data.get("title", self.mw.title)
+        self.mw.games = {g["position"]: CheeseGame(g) for g in data.get("games")}
+        GAMES.update({g.id: g for g in self.mw.games.values()})
+        self.mw.last_update = datetime.datetime.fromisoformat(data.get("updated_at"))
+        self.mw.upstream_url = data.get("upstream_url")
+        self.mw.room_link = data.get("room_link")
+        self.mw.last_port = data.get("last_port")
+        self.mw.hints = data.get("hints", [])
+
+        if self.mw.url.startswith("https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/") and self.mw.upstream_url is not None:
+            self.mw.url = self.mw.upstream_url
+
+
+class WebTrackerAgent(BaseAgent):
+    async def refresh(self, force: bool = False) -> None:
+        if self.rate_limit(datetime.timedelta(hours=1), force):
+            return
+
+        self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
+        if self.mw.upstream_url is None:
+            self.mw.upstream_url = self.mw.url
+        if self.mw.games is None:
+            self.mw.games = {}
+        if self.mw.room_link == "None":
+            self.mw.room_link = None
+        self.mw.ap_tracker_id = self.mw.url.split("/")[-1]
+        logging.info(f"Refreshing cheeseless {self.mw.url}")
+        multitracker_url = self.mw.url
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(multitracker_url) as response:
@@ -570,11 +487,12 @@ class CheeselessMultiworld(Multiworld):
                         return
                     html = await response.text()
             except aiohttp.ClientConnectorError as e:
-                logging.error(f"Connection error occurred while processing tracker {self.url}: {e}")
+                logging.error(f"Connection error occurred while processing tracker {self.mw.url}: {e}")
                 return
         soup = BeautifulSoup(html, features="html.parser")
         title = soup.find("title").string
         if title == "Page Not Found (404)":
+            self.enabled = False
             return
         slots = process_table(soup.find(id="checks-table"))
         for slot in slots:
@@ -588,11 +506,186 @@ class CheeselessMultiworld(Multiworld):
             else:
                 last_activity = datetime.datetime.fromisoformat(slot.get("Last Activity", "1970-01-01T00:00:00Z"))
 
-            if slot_id not in self.games:
-                self.games[slot_id] = CheeseGame({"name": slot["Name"], "game": slot["Game"], "position": int(slot_id)})
-            self.games[slot_id].update({"game": slot["Game"], "last_activity": last_activity.isoformat(), "checks_done": int(checks_done), "checks_total": int(checks_total)})
+            if slot_id not in self.mw.games:
+                self.mw.games[slot_id] = CheeseGame({"name": slot["Name"], "game": slot["Game"], "position": int(slot_id)})
+            self.mw.games[slot_id].update({"game": slot["Game"], "last_activity": last_activity.isoformat(), "checks_done": int(checks_done), "checks_total": int(checks_total)})
 
-        self.last_update = max(g.last_activity for g in self.games.values())
+        self.mw.last_update = max(g.last_activity for g in self.mw.games.values())
+
+    async def refresh_game(self, slot: TrackedGame) -> bool:
+        if slot.game is None or slot.game == "None":
+            await slot.refresh_metadata()
+        logging.info(f"Refreshing {slot.url}")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(slot.url) as response:
+                    if response.status == 500 and "/tracker/" in slot.url:
+                        slot.url = slot.url.replace("/tracker/", "/generic_tracker/")
+                        return await self.refresh_game(slot)
+
+                    if response.status != 200:
+                        slot.failures += 1
+                        return False
+                    html = await response.text()
+        except aiohttp.InvalidUrlClientError:
+            # This is a bad URL, don't try again
+            slot.failures = 100
+            return False
+        except aiohttp.ClientConnectorError as e:
+            logging.error(f"Connection error occurred while processing tracker {slot.url}: {e}")
+            slot.failures += 1
+            return False
+        except aiohttp.ConnectionTimeoutError as e:
+            logging.error(f"Connection timeout error occurred while processing tracker {slot.url}: {e}")
+            slot.failures += 1
+            return False
+        # html = requests.get(self.url).content
+        soup = BeautifulSoup(html, features="html.parser")
+        title = soup.find("title").string
+        if title == "Page Not Found (404)":
+            slot.failures += 1
+            return False
+        recieved = soup.find(id="received-table")
+        if recieved is None:
+            if "/tracker/" in slot.url:
+                slot.url = slot.url.replace("/tracker/", "/generic_tracker/")
+                return await self.refresh_game(slot)
+        # headers = [i.string for i in recieved.find_all("th")]
+        # rows = [[try_int(i.string) for i in r.find_all("td")] for r in recieved.find_all("tr")[1:]]
+        slot.process_locations(soup.find(id="locations-table"))
+        rows = process_table(recieved)
+        slot.last_refresh = datetime.datetime.now(tz=datetime.timezone.utc)
+        if not rows:
+            return False
+
+        index_order = "Last Order Received"
+        index_amount = "Amount"
+        index_item = "Item"
+
+        rows.sort(key=lambda r: r[index_order])
+        if rows[-1][index_order] < slot.latest_item:
+            slot.latest_item = -1
+            return False
+        is_up_to_date = rows[-1][index_order] == slot.latest_item
+        if is_up_to_date and slot.all_items:
+            return False
+
+        new_items: list[NetworkItem] = []
+        for r in rows:
+            slot.all_items[r[index_item]] = r[index_amount]
+            if r[index_order] > slot.latest_item:
+                item = NetworkItem(r[index_item], slot.game, r[index_amount])
+                new_items.append(item)
+                if DATAPACKAGES.get(slot.game) is not None:
+                    classification = DATAPACKAGES[slot.game].items.setdefault(r[index_item], ItemClassification.unknown)
+                    if classification in [ItemClassification.progression, ItemClassification.mcguffin]:
+                        slot.last_progression = (r[index_item], datetime.datetime.now(tz=datetime.UTC))
+
+        if is_up_to_date:
+            return False
+
+        slot.last_item = (rows[-1][index_item], datetime.datetime.now(tz=datetime.UTC))
+        slot.last_recieved = datetime.datetime.now(tz=datetime.UTC)
+
+        slot.latest_item = rows[-1][index_order]
+        slot.new_items = new_items
+
+        slot.failures = 0
+
+        if slot.filters == Filters.none:
+            return False
+        if slot.filters in [Filters.unset, Filters.everything]:
+            slot.notification_queue.extend(new_items)
+            return True
+
+        new_items = [i for i in new_items if i.classification in [ItemClassification.unknown, ItemClassification.bad_name] or slot.filters & Filters(i.classification.value)]
+
+        slot.notification_queue.extend(new_items)
+        return bool(new_items)
+
+
+class ApiTrackerAgent(BaseAgent):
+    async def refresh(self, force: bool = False) -> None:
+        if self.rate_limit(datetime.timedelta(hours=1), force):
+            return
+
+        if self.mw.ap_tracker_id is None:
+            self.mw.ap_tracker_id = self.mw.url.split("/")[-1]
+
+        logging.info(f"Refreshing API multiworld {self.mw.url}")
+        async with aiohttp.ClientSession() as session:
+            if self.mw.static_tracker_data is None:
+                static_url = f"{self.mw.ap_scheme}://{self.mw.ap_hostname}/api/static_tracker/{self.mw.ap_tracker_id}"
+                async with session.get(static_url) as response:
+                    if response.status != 200:
+                        self.enabled = False
+                        return
+                    self.mw.static_tracker_data = await response.json()
+            if self.mw.slot_data is None:
+                slot_url = f"{self.mw.ap_scheme}://{self.mw.ap_hostname}/api/slot_data_tracker/{self.mw.ap_tracker_id}"
+                async with session.get(slot_url) as response:
+                    if response.status != 200:
+                        self.enabled = False
+                        return
+                    self.mw.slot_data = await response.json()
+            api_url = f"{self.mw.ap_scheme}://{self.mw.ap_hostname}/api/tracker/{self.mw.ap_tracker_id}"
+            async with session.get(api_url) as response:
+                if response.status != 200:
+                    self.enabled = False
+                    return
+                data = await response.json()
+        self.mw.player_checks_done = data.get("player_checks_done", [])
+        self.mw.player_items_received = data.get("player_items_received", [])
+
+    async def refresh_game(self, slot: TrackedGame) -> bool:
+        if self.mw.player_items_received is None:
+            await self.refresh()
+            if self.mw.player_items_received is None:
+                return False
+        new_items: list[NetworkItem] = []
+        api_items = self.mw.player_items_received[slot.slot_id - 1]["items"]
+
+        # new_items = [NetworkItem(i["item"], slot.game, i["count"], ItemClassification.from_network_flag(i['flags'])) for i in api_items if i["order"] > slot.latest_item]
+        if len(api_items) - 1 == slot.latest_item:
+            return False
+
+        checksum = self.mw.static_tracker_data["datapackage"].get(slot.game, {}).get("checksum")
+        ap_datapackage = await fetch_datapackage_from_webhost(slot.game, checksum)
+        if not ap_datapackage:
+            logging.warning(f"Could not load datapackage for game {slot.game} with checksum {checksum}")
+            self.enabled = False
+            return False
+        if "item_id_to_name" not in ap_datapackage:
+            ap_datapackage["item_id_to_name"] = {v: k for k, v in ap_datapackage.get("item_name_to_id", {}).items()}
+
+        for index, i in enumerate(api_items, start=0):
+            if index > slot.latest_item:
+                item_id = i[0]
+                #  location = i[1]
+                #  sender = i[2]
+                flags = i[3] if len(i) > 3 else 0
+
+                item_name = ap_datapackage["item_id_to_name"].get(item_id, str(item_id))
+                item = NetworkItem(item_name, slot.game, 1, ItemClassification.from_network_flag(flags))
+                new_items.append(item)
+                if item.classification in [ItemClassification.progression, ItemClassification.mcguffin]:
+                    slot.last_progression = (item_name, datetime.datetime.now(tz=datetime.UTC))
+
+        slot.last_item = (new_items[-1].name, datetime.datetime.now(tz=datetime.UTC))
+        slot.latest_item = len(api_items) - 1
+        slot.last_recieved = datetime.datetime.now(tz=datetime.UTC)
+
+        slot.failures = 0
+
+        if slot.filters == Filters.none:
+            return False
+        if slot.filters in [Filters.unset, Filters.everything]:
+            slot.notification_queue.extend(new_items)
+            return True
+
+        new_items = [i for i in new_items if i.classification in [ItemClassification.unknown, ItemClassification.bad_name] or slot.filters & Filters(i.classification.value)]
+        slot.notification_queue.extend(new_items)
+        return bool(new_items)
 
 
 def process_table(table: Tag) -> list[dict]:
@@ -616,4 +709,5 @@ def try_int(text: Tag | str) -> str | int:
 
 DATAPACKAGES: dict[str, "Datapackage"] = defaultdict(Datapackage)
 GAMES: dict[int, CheeseGame] = {}
-MULTIWORLDS: dict[str, Multiworld] = {}
+MULTIWORLDS_BY_CHEESE: dict[str, Multiworld] = {}
+MULTIWORLDS_BY_AP: dict[str, Multiworld] = {}

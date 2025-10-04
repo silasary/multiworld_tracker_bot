@@ -1,4 +1,5 @@
 import asyncio
+from collections import Counter
 import datetime
 import json
 import logging
@@ -6,7 +7,6 @@ import os
 import re
 import itertools
 
-import aiohttp
 import sentry_sdk
 from interactions import (
     ActionRow,
@@ -30,23 +30,22 @@ from interactions.models.internal.application_commands import OptionType, integr
 from interactions.models.internal.tasks import IntervalTrigger, Task
 from requests.structures import CaseInsensitiveDict
 
+from .models.enums import CompletionStatus, ProgressionStatus
+
+from .models.player import Player
 from ap_alert.converter import converter
 from shared.exceptions import BadAPIKeyException
 
 from . import external_data
 from .multiworld import (
     GAMES,
-    CheeselessMultiworld,
     Datapackage,
     Filters,
     HintFilters,
     ItemClassification,
     Multiworld,
     NetworkItem,
-    Player,
-    ProgressionStatus,
     TrackedGame,
-    CompletionStatus,
 )
 from .worlds import TRACKERS
 
@@ -67,7 +66,7 @@ class APTracker(Extension):
     def __init__(self, bot: Client) -> None:
         self.bot: Client = bot
         self.trackers: dict[int, list[TrackedGame]] = {}
-        self.cheese: dict[str, Multiworld | CheeselessMultiworld] = CaseInsensitiveDict()
+        self.cheese: dict[str, Multiworld] = CaseInsensitiveDict()
         self.datapackages: dict[str, Datapackage] = CaseInsensitiveDict()
         self.players: dict[int, Player] = {}
         self.load()
@@ -103,6 +102,9 @@ class APTracker(Extension):
     @listen()
     async def on_startup(self) -> None:
         await external_data.load_all(self.datapackages)
+        for _user, trackers in self.trackers.items():
+            for tracker in trackers:
+                await self.check_for_dp(tracker)
         self.refresh_all.start()
         self.refresh_all.trigger.last_call_time = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=1)
         external_data.update_datapackage.start()
@@ -191,7 +193,8 @@ class APTracker(Extension):
 
         games = {}
         for tracker in self.get_trackers(ctx.author_id).copy():
-            new_items = await tracker.refresh()
+            _room, multiworld = await self.url_to_multiworld(tracker.multitracker_url)
+            new_items = await multiworld.refresh_game(tracker)
             if new_items:
                 games[tracker] = tracker.notification_queue.copy()
             if tracker.failures >= 3:
@@ -298,27 +301,28 @@ class APTracker(Extension):
         *,
         ephemeral: bool = False,
         inventory: bool = False,
-    ) -> Message:
+    ) -> Message | None:
         async def icon(item: NetworkItem) -> str:
             emoji = "❓"
 
-            if tracker.game in self.datapackages:
+            classification = item.classification
+            if classification == ItemClassification.unknown and tracker.game in self.datapackages:
                 classification = self.datapackages[tracker.game].items.setdefault(item.name, ItemClassification.unknown)
-                if inventory and classification == ItemClassification.unknown:
-                    await self.try_classify(ctx_or_user, tracker, new_items)
-                    classification = self.datapackages[tracker.game].items[item.name]
-                if classification == ItemClassification.mcguffin:
-                    emoji = "✨"
-                if classification == ItemClassification.filler:
-                    emoji = "<:filler:1277502385459171338>"
-                if classification == ItemClassification.useful:
-                    emoji = "<:useful:1277502389729103913>"
-                if classification == ItemClassification.progression:
-                    emoji = "<:progression:1277502382682542143>"
-                if classification == ItemClassification.trap:
-                    emoji = "❌"
+            if inventory and classification == ItemClassification.unknown:
+                await self.try_classify(ctx_or_user, tracker, new_items)
+                classification = self.datapackages[tracker.game].items[item.name]
+            if classification == ItemClassification.mcguffin:
+                emoji = "✨"
+            if classification == ItemClassification.filler:
+                emoji = "<:filler:1277502385459171338>"
+            if classification == ItemClassification.useful:
+                emoji = "<:useful:1277502389729103913>"
+            if classification == ItemClassification.progression:
+                emoji = "<:progression:1277502382682542143>"
+            if classification == ItemClassification.trap:
+                emoji = "❌"
 
-            if inventory:
+            if inventory or item.quantity > 1:
                 return f"{emoji} {item.name} x{item.quantity}"
             return f"{emoji} {item.name}"
 
@@ -339,7 +343,7 @@ class APTracker(Extension):
             await ctx_or_user.send(f"{slot_name}: {names[0]}", ephemeral=ephemeral, components=components)
         elif len(names) > 10:
             text = f"{slot_name}:\n"
-            classes = {
+            classes: dict[ItemClassification, list[NetworkItem]] = {
                 ItemClassification.mcguffin: [],
                 ItemClassification.progression: [],
                 ItemClassification.unknown: [],
@@ -367,6 +371,7 @@ class APTracker(Extension):
                 return await ctx_or_user.send(text, ephemeral=ephemeral)
         else:
             return await ctx_or_user.send(f"{slot_name}: {', '.join(names)}", ephemeral=ephemeral)
+        return None
 
     @ap.subcommand("dashboard")
     async def ap_dashboard(self, ctx: SlashContext) -> None:
@@ -531,7 +536,8 @@ class APTracker(Extension):
         if tracker is None:
             return
         if not tracker.all_items:
-            await tracker.refresh()
+            _room, multiworld = await self.url_to_multiworld(tracker.multitracker_url)
+            await multiworld.refresh_game(tracker)
         await self.send_new_items(ctx, tracker, ephemeral=True, inventory=True)
 
     @component_callback(regex_settings)
@@ -729,7 +735,7 @@ class APTracker(Extension):
 
         return multiworld, found_tracker
 
-    async def url_to_multiworld(self, room) -> tuple[str, Multiworld]:
+    async def url_to_multiworld(self, room: str) -> tuple[str, Multiworld]:
         if isinstance(room, Multiworld):
             multiworld = room
             if multiworld.upstream_url is None:
@@ -754,25 +760,12 @@ class APTracker(Extension):
                 ap_url = f"https://archipelago.gg/tracker/{room}"
             if "generic_tracker" in ap_url:
                 ap_url = ap_url.replace("generic_tracker", "tracker")
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
-                    json={"url": ap_url},
-                ) as response:
-                    if response.status == 403:
-                        return self.cheeseless(ap_url)
-                    if response.status in [400, 404]:
-                        return room, None
-                    ch_id = (await response.json()).get("tracker_id")
 
-            multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
+            multiworld = Multiworld(ap_url)
             if not multiworld.title:
                 multiworld.title = room
-        return room, multiworld
 
-    def cheeseless(self, url: str) -> tuple[str, Multiworld]:
-        """Return a cheeseless Multiworld object."""
-        return url.split("/")[-1], CheeselessMultiworld(url)
+        return room, multiworld
 
     def remove_tracker(self, player, tracker: str | TrackedGame) -> None:
         for t in self.get_trackers(player.id).copy():
@@ -856,51 +849,50 @@ class APTracker(Extension):
                             should_check = False
 
                         if should_check:
-                            new_items = await tracker.refresh()
+                            new_items = await multiworld.refresh_game(tracker)
                         else:
                             new_items = False
 
-                        try:
-                            if not new_items and tracker.failures > 10:
-                                self.remove_tracker(player, tracker.url)
-                                await player.send(f"Tracker {tracker.url} has been removed due to errors")
+                        ### DEBUG
+                        if not player_settings.quiet_mode:
+                            try:
+                                if not new_items and tracker.failures > 10:
+                                    self.remove_tracker(player, tracker.url)
+                                    await player.send(f"Tracker {tracker.url} has been removed due to errors")
+                                    continue
+                                if new_items:
+                                    items = tracker.notification_queue.copy()
+                                    await self.send_new_items(player, tracker)
+                                    asyncio.create_task(self.try_classify(player, tracker, items))
+                            except Forbidden:
+                                logging.error(f"Failed to send message to {player.global_name} ({player.id})")
+                                tracker.failures += 1
                                 continue
-                            if new_items:
-                                items = tracker.notification_queue.copy()
-                                await self.send_new_items(player, tracker)
-                                asyncio.create_task(self.try_classify(player, tracker, items))
-                        except Forbidden:
-                            logging.error(f"Failed to send message to {player.global_name} ({player.id})")
-                            tracker.failures += 1
-                            continue
 
-                        hints = []
-                        try:
-                            if not tracker.disabled:
-                                hints = tracker.refresh_hints(multiworld)
-                        except Exception as e:
-                            sentry_sdk.capture_exception(e)
-                            logging.error(f"Failed to get hints for {tracker.name}")
-                        try:
-                            if hints:
-                                components = []
-                                if tracker.hint_filters == HintFilters.unset:
-                                    components.append(Button(style=ButtonStyle.GREY, label="Configure Hint Filters", emoji="⚙️", custom_id=f"settings:{tracker.id}"))
-                                await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints], components=components)
-                        except Forbidden:
-                            logging.error(f"Failed to send message to {player.global_name} ({player.id})")
-                            tracker.failures += 1
-                            continue
+                            hints = []
+                            try:
+                                if not tracker.disabled:
+                                    hints = tracker.refresh_hints(multiworld)
+                            except Exception as e:
+                                sentry_sdk.capture_exception(e)
+                                logging.error(f"Failed to get hints for {tracker.name}")
+                            try:
+                                if hints:
+                                    components = []
+                                    if tracker.hint_filters == HintFilters.unset:
+                                        components.append(Button(style=ButtonStyle.GREY, label="Configure Hint Filters", emoji="⚙️", custom_id=f"settings:{tracker.id}"))
+                                    await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints], components=components)
+                            except Forbidden:
+                                logging.error(f"Failed to send message to {player.global_name} ({player.id})")
+                                tracker.failures += 1
+                                continue
 
                         tracker_count += 1
                         progress += 1
                         games[tracker.game] = games.get(tracker.game, 0) + 1
                         if should_check:
                             # if we didn't check anything, we don't need to wait
-                            if self.tracker_count > 720:
-                                await asyncio.sleep(3)  # three doesn't go into 3600 evenly, so overflows will be spread out
-                            else:
-                                await asyncio.sleep(5)
+                            await asyncio.sleep(1)  # We're popular
                         else:
                             await asyncio.sleep(0)
                     except Exception as e:
@@ -918,6 +910,7 @@ class APTracker(Extension):
                 print(e)
                 await asyncio.sleep(5)
 
+        agents = Counter()
         to_delete = []
         for room_id, multiworld in self.cheese.items():
             if multiworld.last_update and datetime.datetime.now(tz=multiworld.last_update.tzinfo) - multiworld.last_update > datetime.timedelta(days=7):
@@ -933,12 +926,17 @@ class APTracker(Extension):
                 logging.info(f"Removing {room_id} from cheese trackers")
                 to_delete.append(room_id)
 
+            for agent in multiworld.agents:
+                if multiworld.agents[agent].enabled:
+                    agents[agent] += 1
+
         for room_id in to_delete:
             del self.cheese[room_id]
 
         self.tracker_count = tracker_count
         self.user_count = user_count
         self.stats["games"] = games
+        self.stats["agents"] = dict(agents)
         self.save()
         activity = Activity(name=f"{tracker_count} slots across {user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
@@ -955,7 +953,7 @@ class APTracker(Extension):
         trackers = json.dumps(converter.unstructure(self.trackers), indent=2)
         with open("trackers.json", "w") as f:
             f.write(trackers)
-        cheese = json.dumps(converter.unstructure(self.cheese, Multiworld | CheeselessMultiworld), indent=2)
+        cheese = json.dumps(converter.unstructure(self.cheese), indent=2)
         with open("cheese.json", "w") as f:
             f.write(cheese)
         dp = json.dumps(converter.unstructure(self.datapackages), indent=2)
@@ -975,7 +973,7 @@ class APTracker(Extension):
         try:
             if os.path.exists("cheese.json"):
                 with open("cheese.json") as f:
-                    self.cheese = converter.structure(json.loads(f.read()), dict[str, Multiworld | CheeselessMultiworld])
+                    self.cheese = converter.structure(json.loads(f.read()), dict[str, Multiworld])
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
