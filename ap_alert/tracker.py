@@ -785,6 +785,8 @@ class APTracker(Extension):
 
     @Task.create(IntervalTrigger(hours=1))
     async def refresh_all(self) -> None:
+        task_id = self.refresh_all.iteration
+        logging.info(f"Starting refresh_all task {task_id}")
         user_count = 0
         tracker_count = 0
         progress = 0
@@ -950,6 +952,7 @@ class APTracker(Extension):
         self.save()
         activity = Activity(name=f"{tracker_count} slots across {user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
+        logging.info(f"Completed refresh_all task {task_id}: {tracker_count} trackers for {user_count} users")
 
     async def get_classification(self, game, item):
         if game not in self.datapackages:
