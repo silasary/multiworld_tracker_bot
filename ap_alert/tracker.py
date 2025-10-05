@@ -898,9 +898,12 @@ class APTracker(Extension):
                         progress += 1
                         games[tracker.game] = games.get(tracker.game, 0) + 1
                         if should_check:
-                            # if we didn't check anything, we don't need to wait
-                            await asyncio.sleep(1)  # We're popular
+                            if "webtracker" in multiworld.agents:
+                                await asyncio.sleep(3)  # Webtrackers are slow
+                            else:
+                                await asyncio.sleep(1)
                         else:
+                            # if we didn't check anything, we don't need to wait
                             await asyncio.sleep(0)
                     except Exception as e:
                         logging.error(f"Error occurred while processing tracker {tracker.id} for user {user}: {e}")
