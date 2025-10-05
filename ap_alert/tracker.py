@@ -1,5 +1,5 @@
 import asyncio
-from collections import Counter
+from collections import Counter, defaultdict
 import datetime
 import json
 import logging
@@ -347,14 +347,17 @@ class APTracker(Extension):
             await ctx_or_user.send(f"{slot_name}: {names[0]}", ephemeral=ephemeral, components=components)
         elif len(names) > 10:
             text = f"{slot_name}:\n"
-            classes: dict[ItemClassification, list[NetworkItem]] = {
-                ItemClassification.mcguffin: [],
-                ItemClassification.progression: [],
-                ItemClassification.unknown: [],
-                ItemClassification.useful: [],
-                ItemClassification.filler: [],
-                ItemClassification.trap: [],
-            }
+            classes: dict[ItemClassification, list[NetworkItem]] = defaultdict(list)
+            classes.update(
+                {  # presort the keys
+                    ItemClassification.mcguffin: [],
+                    ItemClassification.progression: [],
+                    ItemClassification.unknown: [],
+                    ItemClassification.useful: [],
+                    ItemClassification.filler: [],
+                    ItemClassification.trap: [],
+                }
+            )
 
             for item in new_items:
                 classification = item.classification
