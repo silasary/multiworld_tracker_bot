@@ -920,7 +920,7 @@ class APTracker(Extension):
                 print(e)
                 await asyncio.sleep(5)
 
-        agents = Counter()
+        agents: Counter[str] = Counter()
         to_delete = []
         for room_id, multiworld in self.cheese.items():
             if multiworld.last_update and datetime.datetime.now(tz=multiworld.last_update.tzinfo) - multiworld.last_update > datetime.timedelta(days=7):
