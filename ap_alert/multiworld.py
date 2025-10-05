@@ -578,7 +578,7 @@ class WebTrackerAgent(BaseAgent):
         for r in rows:
             slot.all_items[r[index_item]] = r[index_amount]
             if r[index_order] > slot.latest_item:
-                item = NetworkItem(r[index_item], slot.game, r[index_amount])
+                item = NetworkItem(r[index_item], slot.game, 1)
                 new_items.append(item)
                 if DATAPACKAGES.get(slot.game) is not None:
                     classification = DATAPACKAGES[slot.game].items.setdefault(r[index_item], ItemClassification.unknown)
@@ -674,6 +674,9 @@ class ApiTrackerAgent(BaseAgent):
                 new_items.append(item)
                 if item.classification in [ItemClassification.progression, ItemClassification.mcguffin]:
                     slot.last_progression = (item_name, datetime.datetime.now(tz=datetime.UTC))
+
+        if not new_items:
+            return False
 
         slot.last_item = (new_items[-1].name, datetime.datetime.now(tz=datetime.UTC))
         slot.latest_item = len(api_items) - 1
