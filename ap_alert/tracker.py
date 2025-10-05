@@ -112,6 +112,10 @@ class APTracker(Extension):
         activity = Activity(name=f"{self.tracker_count} slots across {self.user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
 
+    @listen()
+    async def on_disconnect(self) -> None:
+        self.save()
+
     @slash_command("ap")
     @integration_types(guild=True, user=True)
     async def ap(self, ctx: SlashContext) -> None:
