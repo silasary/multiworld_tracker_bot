@@ -45,7 +45,7 @@ async def git_output(args: list[str], cwd: str) -> str:
         return output[0].decode("utf-8")
 
 
-@Task.create(IntervalTrigger(hours=1))
+@Task.create(IntervalTrigger(hours=24))
 async def update_datapackage() -> None:
     """Update the datapackage."""
     await clone_repo()
