@@ -323,8 +323,6 @@ class Multiworld:
     agents: dict[str, "BaseAgent"] = attrs.field(factory=dict, repr=False, init=False)
 
     async def refresh(self, force: bool = False) -> None:
-        self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
-
         if "cheese" not in self.agents:
             self.agents["cheese"] = CheeseAgent(self)
         await self.agents["cheese"].refresh(force)
@@ -336,6 +334,7 @@ class Multiworld:
                 self.agents["webtracker"] = WebTrackerAgent(self)
             await self.agents["webtracker"].refresh(force)
 
+        self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
         if self.cheese_tracker_id is not None and MULTIWORLDS_BY_CHEESE.get(self.cheese_tracker_id) is not self:
             MULTIWORLDS_BY_CHEESE[self.cheese_tracker_id] = self
         if self.ap_tracker_id is not None and MULTIWORLDS_BY_AP.get(self.ap_tracker_id) is not self:
@@ -470,7 +469,6 @@ class WebTrackerAgent(BaseAgent):
         if self.rate_limit(datetime.timedelta(hours=1), force):
             return
 
-        self.last_refreshed = datetime.datetime.now(tz=datetime.UTC)
         if self.mw.upstream_url is None:
             self.mw.upstream_url = self.mw.url
         if self.mw.games is None:
@@ -491,7 +489,7 @@ class WebTrackerAgent(BaseAgent):
                 return
             except aiohttp.ConnectionTimeoutError as e:
                 logging.error(f"Connection timeout error occurred while processing tracker {self.mw.url}: {e}")
-                self.enabled = False
+                self.last_refreshed = datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(hours=24)  # back off for a day
                 return
         soup = BeautifulSoup(html, features="html.parser")
         title = soup.find("title").string
@@ -517,6 +515,9 @@ class WebTrackerAgent(BaseAgent):
         self.mw.last_update = max(g.last_activity for g in self.mw.games.values())
 
     async def refresh_game(self, slot: TrackedGame) -> bool:
+        if not self.enabled:
+            return False
+
         if slot.game is None or slot.game == "None":
             await slot.refresh_metadata()
         logging.info(f"Refreshing {slot.url}")
@@ -535,12 +536,12 @@ class WebTrackerAgent(BaseAgent):
             # This is a bad URL, don't try again
             slot.failures = 100
             return False
-        except aiohttp.ClientConnectorError as e:
-            logging.error(f"Connection error occurred while processing tracker {slot.url}: {e}")
-            slot.failures += 1
-            return False
         except aiohttp.ConnectionTimeoutError as e:
             logging.error(f"Connection timeout error occurred while processing tracker {slot.url}: {e}")
+            slot.failures += 1
+            return False
+        except aiohttp.ClientConnectorError as e:
+            logging.error(f"Connection error occurred while processing tracker {slot.url}: {e}")
             slot.failures += 1
             return False
         # html = requests.get(self.url).content
