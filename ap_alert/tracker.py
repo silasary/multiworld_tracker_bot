@@ -49,6 +49,9 @@ from .multiworld import (
 )
 from .worlds import TRACKERS
 
+task_logger = logging.getLogger("ap_alert.tasks")
+task_logger.setLevel(logging.INFO)
+
 regex_dash = re.compile(r"dash:(-?\d+)")
 regex_unblock = re.compile(r"unblock:(\d+)")
 regex_remove = re.compile(r"remove:(-?\d+)")
@@ -786,7 +789,7 @@ class APTracker(Extension):
     @Task.create(IntervalTrigger(hours=1))
     async def refresh_all(self) -> None:
         task_id = self.refresh_all.iteration
-        logging.info(f"Starting refresh_all task {task_id}")
+        task_logger.info(f"Starting refresh_all task {task_id}")
         user_count = 0
         tracker_count = 0
         progress = 0
@@ -906,7 +909,7 @@ class APTracker(Extension):
                                 await asyncio.sleep(1)
                         else:
                             # if we didn't check anything, we don't need to wait
-                            await asyncio.sleep(0)
+                            await asyncio.sleep(1)
                     except Exception as e:
                         logging.error(f"Error occurred while processing tracker {tracker.id} for user {user}: {e}")
                         sentry_sdk.capture_exception(e)
@@ -952,7 +955,7 @@ class APTracker(Extension):
         self.save()
         activity = Activity(name=f"{tracker_count} slots across {user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
-        logging.info(f"Completed refresh_all task {task_id}: {tracker_count} trackers for {user_count} users")
+        task_logger.info(f"Completed refresh_all task {task_id}: {tracker_count} trackers for {user_count} users")
 
     async def get_classification(self, game, item):
         if game not in self.datapackages:
