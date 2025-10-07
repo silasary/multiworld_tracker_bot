@@ -246,7 +246,7 @@ class APTracker(Extension):
         unclassified = [i.name for i in new_items if i.classification in [ItemClassification.unknown, ItemClassification.bad_name]]
         n = 0
         for item in unclassified:
-            if TRACKERS.get(tracker.game) and (classification := TRACKERS[tracker.game].classify(tracker, item)):
+            if TRACKERS.get(tracker.game) and (classification := await TRACKERS[tracker.game].classify(tracker, item)):
                 if self.datapackages[tracker.game].set_classification(item, classification):
                     continue
 
