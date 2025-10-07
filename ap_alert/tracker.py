@@ -214,8 +214,13 @@ class APTracker(Extension):
             self.save()
             return
 
+        n = 0
         for tracker, items in games.items():
             await self.send_new_items(ctx, tracker, ephemeral=ephemeral)
+            n += 1
+            if n > 3 and isinstance(ctx, InteractionContext):
+                ctx = ctx.author
+                ephemeral = False
 
         for tracker, items in games.items():
             await self.try_classify(ctx, tracker, items, ephemeral=ephemeral)
