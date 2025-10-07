@@ -26,7 +26,9 @@ from interactions import (
 )
 from interactions.client.errors import Forbidden, NotFound
 from interactions.ext.paginators import Paginator
-from interactions.models.discord import Button, ButtonStyle, User, Embed, Message, ContainerComponent, TextDisplayComponent
+from interactions.models.discord import User, Embed, Message, Member
+from interactions.models.discord.components import Button, ContainerComponent, TextDisplayComponent
+from interactions.models.discord.enums import ButtonStyle
 from interactions.models.internal.application_commands import OptionType, integration_types, slash_command, slash_option
 from interactions.models.internal.tasks import IntervalTrigger, Task
 from requests.structures import CaseInsensitiveDict
@@ -378,7 +380,7 @@ class APTracker(Extension):
 
             if len(text) > 1900:
                 paginator = Paginator.create_from_string(self.bot, text)
-                if isinstance(ctx_or_user, User):
+                if isinstance(ctx_or_user, (User, Member)):
                     # I hate this so much.  Paginators currently require a context, but we're sliding into DMs.
                     # This makes the user look like a context so that the paginator can do button things and not crash.
                     ctx_or_user.author = ctx_or_user
