@@ -9,7 +9,6 @@ python_version = "3.12"
 [packages]
 beautifulsoup4 = ">=4.13.3"
 cattrs = ">=24.1.2"
-"interactions.py" = {extras = ["speedup"], version = ">=5.15.0rc1", pre = true}
 "jurigged" = ">=0.6.0"
 pyyaml = ">=6.0.2"
 pymongo = ">=4.11.2"
@@ -17,5 +16,6 @@ redis = ">=5.2.1"
 requests = ">=2.32.3"
 sentry-sdk = ">=2.22.0"
 platformdirs = "*"
+"interactions.py" = {git = "https://github.com/interactions-py/interactions.py.git@garbage-protection"}
 
 [dev-packages]
