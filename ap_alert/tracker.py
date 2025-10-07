@@ -64,7 +64,7 @@ regex_hint_filter = re.compile(r"hint_filter:(\d+|default):(-?\d+)")
 
 
 class APTracker(Extension):
-    stats: dict[str, int] = {}
+    stats: dict[str, int | dict] = {}
 
     def __init__(self, bot: Client) -> None:
         self.bot: Client = bot
@@ -109,11 +109,11 @@ class APTracker(Extension):
             for tracker in trackers:
                 await self.check_for_dp(tracker)
         self.refresh_all.start()
-        self.refresh_all.trigger.last_call_time = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=1)
         external_data.update_datapackage.start()
         await external_data.update_datapackage()
         activity = Activity(name=f"{self.tracker_count} slots across {self.user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
+        await self.refresh_all()
 
     @listen()
     async def on_disconnect(self) -> None:
@@ -791,8 +791,8 @@ class APTracker(Extension):
                 self.get_trackers(player.id).remove(t)
                 return
 
-    @Task.create(IntervalTrigger(hours=1))
-    async def refresh_all(self) -> None:
+    @Task.create(IntervalTrigger(hours=6))
+    async def refresh_all(self) -> IntervalTrigger | None:
         task_id = self.refresh_all.iteration
         task_logger.info(f"Starting refresh_all task {task_id}")
         user_count = 0
@@ -961,6 +961,11 @@ class APTracker(Extension):
         activity = Activity(name=f"{tracker_count} slots across {user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
         task_logger.info(f"Completed refresh_all task {task_id}: {tracker_count} trackers for {user_count} users")
+        trigger = self.refresh_all.trigger
+        if isinstance(trigger, IntervalTrigger) and trigger.delta.total_seconds() // 3600 != max(1, tracker_count // 3600 + 1):
+            task_logger.info(f"Adjusted refresh_all interval to {trigger.delta}")
+            return IntervalTrigger(hours=max(1, tracker_count // 3600 + 1))
+        return None
 
     async def get_classification(self, game, item):
         if game not in self.datapackages:
