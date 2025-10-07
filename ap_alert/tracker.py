@@ -12,6 +12,7 @@ from interactions import (
     ActionRow,
     Activity,
     ActivityType,
+    BaseTrigger,
     Client,
     ComponentContext,
     Extension,
@@ -792,7 +793,7 @@ class APTracker(Extension):
                 return
 
     @Task.create(IntervalTrigger(hours=6))
-    async def refresh_all(self) -> IntervalTrigger | None:
+    async def refresh_all(self) -> BaseTrigger | None:
         task_id = self.refresh_all.iteration
         task_logger.info(f"Starting refresh_all task {task_id}")
         user_count = 0
@@ -962,9 +963,11 @@ class APTracker(Extension):
         await self.bot.change_presence(activity=activity)
         task_logger.info(f"Completed refresh_all task {task_id}: {tracker_count} trackers for {user_count} users")
         trigger = self.refresh_all.trigger
-        if isinstance(trigger, IntervalTrigger) and trigger.delta.total_seconds() // 3600 != max(1, tracker_count // 3600 + 1):
+
+        hours = int(max(1, tracker_count // 3600 + 1))
+        if isinstance(trigger, IntervalTrigger) and int(trigger.delta.total_seconds() // 3600) != hours:
             task_logger.info(f"Adjusted refresh_all interval to {trigger.delta}")
-            return IntervalTrigger(hours=max(1, tracker_count // 3600 + 1))
+            return IntervalTrigger(hours=hours)
         return None
 
     async def get_classification(self, game, item):
