@@ -4,6 +4,7 @@ import datetime
 import json
 import logging
 import os
+import random
 import re
 import itertools
 
@@ -803,7 +804,9 @@ class APTracker(Extension):
         progress = 0
         games: dict[str, int] = {}
 
-        for user, trackers in self.trackers.copy().items():
+        queue = list(self.trackers.items())
+        random.shuffle(queue)
+        for user, trackers in queue:
             try:
                 player = await self.bot.fetch_user(user)
                 if not player:
