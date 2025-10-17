@@ -800,6 +800,10 @@ class APTracker(Extension):
     @Task.create(IntervalTrigger(hours=6))
     async def refresh_all(self) -> BaseTrigger | None:
         task_id = self.refresh_all.iteration
+        self.stats["running_refresh"] = {
+            "task_id": task_id,
+        }
+
         task_logger.info(f"Starting refresh_all task {task_id}")
         user_count = 0
         tracker_count = 0
@@ -931,6 +935,12 @@ class APTracker(Extension):
                 if trackers:
                     user_count += 1
                 if progress > 100:
+                    self.stats["running_refresh"] = {
+                        "task_id": task_id,
+                        "current_user": user_count,
+                        "total_users": len(self.trackers),
+                        "current_tracker_count": tracker_count,
+                    }
                     await self.save()
                     progress = 0
             except Exception as e:
