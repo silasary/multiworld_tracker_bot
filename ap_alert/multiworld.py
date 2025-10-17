@@ -314,11 +314,11 @@ class Multiworld:
     room_link: str | None = None
     last_port: Optional[int] = None
     hints: list[dict] | None = attrs.field(factory=list)
-    player_checks_done: list[dict] = attrs.field(factory=list)
-    player_items_received: list[dict] = attrs.field(factory=list)
+    player_checks_done: list[dict] = attrs.field(factory=list, init=False)
+    player_items_received: list[dict] = attrs.field(factory=list, init=False)
 
-    static_tracker_data: dict | None = None
-    slot_data: list[dict] | None = None
+    static_tracker_data: dict | None = attrs.field(init=False, repr=False, default=None)
+    slot_data: list[dict] | None = attrs.field(init=False, repr=False, default=None)
 
     agents: dict[str, "BaseAgent"] = attrs.field(factory=dict, repr=False, init=False)
 
