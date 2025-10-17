@@ -476,6 +476,10 @@ class APTracker(Extension):
                 name = name + port
 
         dp = self.datapackages.get(tracker.game)
+        if dp is None:
+            dp = Datapackage(game_name=tracker.game)
+            await external_data.import_datapackage(tracker.game, dp)
+            self.datapackages[tracker.game] = dp
 
         last_refreshed = format_relative_time(tracker.last_refresh) or "Never"
         last_item_name = f"{dp.icon(tracker.last_item[0])} {tracker.last_item[0]}" if tracker.last_item[0] else ""
@@ -848,6 +852,11 @@ class APTracker(Extension):
     @Task.create(IntervalTrigger(hours=6))
     async def refresh_all(self) -> BaseTrigger | None:
         task_id = self.refresh_all.iteration
+        start_time = datetime.datetime.now(tz=datetime.UTC)
+        self.stats["running_refresh"] = {
+            "task_id": task_id,
+        }
+
         task_logger.info(f"Starting refresh_all task {task_id}")
         user_count = 0
         tracker_count = 0
@@ -960,20 +969,29 @@ class APTracker(Extension):
                         tracker_count += 1
                         progress += 1
                         games[tracker.game] = games.get(tracker.game, 0) + 1
-                        task_logger.debug(f"Finished processing tracker {tracker.url} for user {user}")
+                        used_agents = ", ".join(k for k in multiworld.agents if multiworld.agents[k].enabled)
+                        task_logger.debug(f"Finished processing tracker {tracker.url} for user {user} (using agents: {used_agents})")
                         if should_check:
                             if "webtracker" in multiworld.agents:
                                 await asyncio.sleep(3)  # Webtrackers are slow
                             else:
-                                await asyncio.sleep(2)
-                        else:
+                                await asyncio.sleep(0.5)
+                        elif "webtracker" in multiworld.agents:
                             await asyncio.sleep(2)
+                        else:
+                            await asyncio.sleep(0)
                     except Exception as e:
                         logging.error(f"Error occurred while processing tracker {tracker._id} for user {user}: {e}")
                         sentry_sdk.capture_exception(e)
 
                 if trackers:
                     user_count += 1
+                    self.stats["running_refresh"] = {
+                        "task_id": task_id,
+                        "current_user": user_count,
+                        "total_users": len(self.trackers),
+                        "current_tracker_count": tracker_count,
+                    }
             except Exception as e:
                 sentry_sdk.capture_exception(e)
                 logging.error(f"Failed to refresh trackers for {user}")
@@ -1010,13 +1028,14 @@ class APTracker(Extension):
         await self.save()
         activity = Activity(name=f"{tracker_count} slots across {user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
-        task_logger.info(f"Completed refresh_all task {task_id}: {tracker_count} trackers for {user_count} users")
+        time_taken = datetime.datetime.now(tz=datetime.UTC) - start_time
+        task_logger.info(f"Completed refresh_all task {task_id}: {tracker_count} trackers for {user_count} users in {time_taken}")
         trigger = self.refresh_all.trigger
 
         hours = int(max(1, tracker_count // 3600 + 1))
         if isinstance(trigger, IntervalTrigger) and int(trigger.delta.total_seconds() // 3600) != hours:
             task_logger.info(f"Adjusted refresh_all interval to {hours} hours")
-            return IntervalTrigger(hours=hours)
+            self.refresh_all.trigger = IntervalTrigger(hours=hours)
         return None
 
     async def get_classification(self, game, item):
