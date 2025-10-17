@@ -1001,7 +1001,10 @@ class APTracker(Extension):
         return self.datapackages[game].items[item]
 
     async def save(self):
-        task_logger.info("Saving tracker data to disk")
+        if datetime.datetime.now(tz=datetime.UTC) - self.last_save < datetime.timedelta(seconds=60):
+            return
+        self.last_save = datetime.datetime.now(tz=datetime.UTC)
+        task_logger.debug("Saving tracker data to disk")
         trackers = json.dumps(converter.unstructure(self.trackers), indent=2)
         async with aiofiles.open("trackers.json", "w") as f:
             await f.write(trackers)
@@ -1014,7 +1017,7 @@ class APTracker(Extension):
         stats = json.dumps(self.stats, indent=2)
         async with aiofiles.open("stats.json", "w") as f:
             await f.write(stats)
-        task_logger.info("Finished saving tracker data to disk")
+        task_logger.debug("Finished saving tracker data to disk")
 
     def load(self):
         if os.path.exists("trackers.json"):
@@ -1051,6 +1054,7 @@ class APTracker(Extension):
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
+        self.last_save = datetime.datetime.now(tz=datetime.UTC)
 
 
 def recolour_buttons(components: list[ActionRow]) -> list[Button]:
