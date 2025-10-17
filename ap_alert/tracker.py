@@ -987,7 +987,7 @@ class APTracker(Extension):
         hours = int(max(1, tracker_count // 3600 + 1))
         if isinstance(trigger, IntervalTrigger) and int(trigger.delta.total_seconds() // 3600) != hours:
             task_logger.info(f"Adjusted refresh_all interval to {hours} hours")
-            return IntervalTrigger(hours=hours)
+            self.refresh_all.trigger = IntervalTrigger(hours=hours)
         return None
 
     async def get_classification(self, game, item):
