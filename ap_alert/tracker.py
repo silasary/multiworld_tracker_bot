@@ -462,8 +462,8 @@ class APTracker(Extension):
         embed.add_field("Progression Status", f"{tracker.progression_status.name} (Last Checked: {last_activity})")
         components = []
 
-        components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji="💼", custom_id=f"inv:{tracker.id}"))
-        components.append(Button(style=ButtonStyle.GREY, label="Settings", emoji="⚙️", custom_id=f"settings:{tracker.id}"))
+        components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji=":briefcase:", custom_id=f"inv:{tracker.id}"))
+        components.append(Button(style=ButtonStyle.GREY, label="Settings", emoji=":gear:", custom_id=f"settings:{tracker.id}"))
         if multiworld and multiworld.room_link:
             components.append(Button(style=ButtonStyle.URL, label="Open Room", url=multiworld.room_link))
 
@@ -487,9 +487,9 @@ class APTracker(Extension):
                 components.append(Button(style=ButtonStyle.RED, label="BK", custom_id=f"bk:{tracker.id}"))
 
         if not is_owner or only_game:
-            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji="🗑️", custom_id=f"remove:{tracker.id}"))
+            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji=":wastebasket:", custom_id=f"remove:{tracker.id}"))
         else:
-            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji="🗑️", custom_id=f"disable:{tracker.id}"))
+            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji=":wastebasket:", custom_id=f"disable:{tracker.id}"))
         embeds = [embed]
         if TRACKERS.get(tracker.game) and (dash := await TRACKERS[tracker.game].build_dashboard(tracker)):
             embeds.append(dash)
