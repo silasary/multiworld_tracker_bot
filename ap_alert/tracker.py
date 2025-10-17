@@ -4,7 +4,6 @@ import datetime
 import json
 import logging
 import os
-import random
 import re
 import itertools
 
@@ -59,7 +58,7 @@ from .multiworld import (
 from .worlds import TRACKERS
 
 task_logger = logging.getLogger("ap_alert.tasks")
-task_logger.setLevel(logging.DEBUG)
+task_logger.setLevel(logging.INFO)
 
 regex_dash = re.compile(r"dash:(-?\d+)")
 regex_unblock = re.compile(r"unblock:(\d+)")
@@ -292,12 +291,12 @@ class APTracker(Extension):
                 if self.datapackages[tracker.game].set_classification(item, classification):
                     continue
 
-            trap = Button(style=ButtonStyle.RED, label="Trap", emoji="❌")
+            trap = Button(style=ButtonStyle.RED, label="Trap", emoji=":x:")
             filler = Button(style=ButtonStyle.GREY, label="Filler", emoji="<:filler:1277502385459171338>")
             useful = Button(style=ButtonStyle.GREEN, label="Useful", emoji="<:useful:1277502389729103913>")
             progression = Button(style=ButtonStyle.BLUE, label="Progression", emoji="<:progression:1277502382682542143>")
-            mcguffin = Button(style=ButtonStyle.BLUE, label="McGuffin", emoji="✨")
-            skip = Button(style=ButtonStyle.GREY, label="Skip", emoji="⏭️")
+            mcguffin = Button(style=ButtonStyle.BLUE, label="McGuffin", emoji=":sparkles:")
+            skip = Button(style=ButtonStyle.GREY, label="Skip", emoji=":track_next:")
             msg = await ctx.send(
                 f"[{tracker.game}] What kind of item is {item}?",
                 ephemeral=ephemeral,
@@ -864,7 +863,7 @@ class APTracker(Extension):
         games: dict[str, int] = {}
 
         queue = self.get_all_players()
-        random.shuffle(queue)
+        # random.shuffle(queue)
         for user in queue:
             task_logger.debug(f"Processing user {user}")
             trackers = self.get_trackers(user)
@@ -1054,9 +1053,6 @@ class APTracker(Extension):
         cheese = json.dumps(converter.unstructure(self.cheese), indent=2)
         async with aiofiles.open("cheese.json", "w") as f:
             await f.write(cheese)
-        dp = json.dumps(converter.unstructure(self.datapackages), indent=2)
-        async with aiofiles.open("gamedata.json", "w") as f:
-            await f.write(dp)
         players = json.dumps(converter.unstructure(self.players), indent=2)
         async with aiofiles.open("players.json", "w") as f:
             await f.write(players)
@@ -1083,35 +1079,12 @@ class APTracker(Extension):
             sentry_sdk.capture_exception(e)
             print(e)
         try:
-            if os.path.exists("gamedata.json"):
-                with open("gamedata.json") as f:
-                    self.datapackages.update(converter.structure(json.loads(f.read()), dict[str, Datapackage]))
-        except Exception as e:
-            sentry_sdk.capture_exception(e)
-            print(e)
-        try:
             if os.path.exists("players.json"):
                 with open("players.json") as f:
                     self.players = converter.structure(json.loads(f.read()), dict[int, Player])
                 for player in self.players.values():
                     if player.cheese_api_key:
                         self.get_trackers(player.id)
-        except Exception as e:
-            sentry_sdk.capture_exception(e)
-            print(e)
-        try:
-            if os.path.exists("datapackages.json"):
-                os.unlink("datapackages.json")
-        except Exception as e:
-            sentry_sdk.capture_exception(e)
-            print(e)
-        try:
-            if os.path.exists("flush.json"):
-                with open("flush.json") as f:
-                    flush = json.loads(f.read())
-                    for dp in flush:
-                        self.datapackages[dp].items.clear()
-                os.rename("flush.json", "flushed.json")
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
