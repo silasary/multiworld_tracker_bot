@@ -629,10 +629,14 @@ class ApiTrackerAgent(BaseAgent):
             if self.mw.slot_data is None:
                 slot_url = f"{self.mw.ap_scheme}://{self.mw.ap_hostname}/api/slot_data_tracker/{self.mw.ap_tracker_id}"
                 async with session.get(slot_url) as response:
-                    if response.status != 200:
+                    if response.status == 500:
+                        # Temporary hack
+                        self.mw.slot_data = []
+                    elif response.status != 200:
                         self.enabled = False
                         return
-                    self.mw.slot_data = await response.json()
+                    else:
+                        self.mw.slot_data = await response.json()
             api_url = f"{self.mw.ap_scheme}://{self.mw.ap_hostname}/api/tracker/{self.mw.ap_tracker_id}"
             async with session.get(api_url) as response:
                 if response.status != 200:
