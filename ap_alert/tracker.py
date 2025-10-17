@@ -332,6 +332,8 @@ class APTracker(Extension):
                 emoji = "<:progression:1277502382682542143>"
             if classification == ItemClassification.trap:
                 emoji = "❌"
+            if classification == ItemClassification.progression | ItemClassification.trap:
+                emoji = "<:prog_trap:1428702147435954237>"
 
             if inventory or item.quantity > 1:
                 return f"{emoji} {item.name} x{item.quantity}"
