@@ -448,7 +448,6 @@ class CheeseAgent(BaseAgent):
         async with aiohttp.ClientSession() as session:
             async with session.get(self.mw.cheese_url) as response:
                 txt = await response.text()
-        # data = requests.get(self.url).text
         data = json.loads(txt)
         self.mw.cheese_tracker_id = data.get("tracker_id")
         self.mw.title = data.get("title", self.mw.title)
@@ -544,7 +543,6 @@ class WebTrackerAgent(BaseAgent):
             logging.error(f"Connection error occurred while processing tracker {slot.url}: {e}")
             slot.failures += 1
             return False
-        # html = requests.get(self.url).content
         soup = BeautifulSoup(html, features="html.parser")
         title = soup.find("title").string
         if title == "Page Not Found (404)":

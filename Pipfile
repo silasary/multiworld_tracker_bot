@@ -17,5 +17,6 @@ requests = ">=2.32.3"
 sentry-sdk = ">=2.22.0"
 platformdirs = "*"
 "interactions.py" = {git = "https://github.com/interactions-py/interactions.py.git@garbage-protection"}
+aiofiles = "*"
 
 [dev-packages]

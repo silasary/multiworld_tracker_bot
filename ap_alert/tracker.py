@@ -8,6 +8,7 @@ import random
 import re
 import itertools
 
+import aiofiles
 import sentry_sdk
 from interactions import (
     ActionRow,
@@ -95,7 +96,6 @@ class APTracker(Extension):
     @user_count.setter
     def user_count(self, value):
         self.stats["user_count"] = value
-        self.save()
 
     @property
     def tracker_count(self):
@@ -104,7 +104,6 @@ class APTracker(Extension):
     @tracker_count.setter
     def tracker_count(self, value):
         self.stats["tracker_count"] = value
-        self.save()
 
     @listen()
     async def on_startup(self) -> None:
@@ -121,7 +120,7 @@ class APTracker(Extension):
 
     @listen()
     async def on_disconnect(self) -> None:
-        self.save()
+        await self.save()
 
     @slash_command("ap")
     @integration_types(guild=True, user=True)
@@ -161,7 +160,7 @@ class APTracker(Extension):
             else:
                 tracker = TrackedGame(url)
                 self.get_trackers(ctx.author_id).append(tracker)
-                self.save()
+                await self.save()
 
             room, multiworld = await self.url_to_multiworld("/".join(url.split("/")[:-2]))
             if multiworld is None:
@@ -211,11 +210,11 @@ class APTracker(Extension):
             if tracker.failures >= 3:
                 self.remove_tracker(ctx.author, tracker)
                 await ctx.send(f"Tracker {tracker.url} has been removed due to errors", ephemeral=ephemeral)
-                self.save()
+                await self.save()
 
         if not games:
             await ctx.send("No new items", ephemeral=True)
-            self.save()
+            await self.save()
             return
 
         n = 0
@@ -228,7 +227,7 @@ class APTracker(Extension):
 
         for tracker, items in games.items():
             await self.try_classify(ctx, tracker, items, ephemeral=ephemeral)
-        self.save()
+        await self.save()
 
     @ap.subcommand("authenticate")
     @slash_option("api_key", "Your Cheese Tracker API key", OptionType.STRING, required=True)
@@ -237,14 +236,14 @@ class APTracker(Extension):
         player = self.get_player_settings(ctx.author_id)
         player.cheese_api_key = api_key.strip()
         await ctx.send("API key saved", ephemeral=True)
-        self.save()
         try:
             cheese_dash = await player.get_trackers()
         except BadAPIKeyException:
             await ctx.send("That's not a valid API Key...  Please copy it directly from https://cheesetrackers.theincrediblewheelofchee.se/settings", ephemeral=True)
             player.cheese_api_key = None
-            self.save()
+            await self.save()
             return
+        await self.save()
 
         for multiworld in cheese_dash:
             await self.sync_cheese(ctx.author, multiworld)
@@ -308,7 +307,6 @@ class APTracker(Extension):
                 pass
             except Forbidden:
                 pass
-            self.save()
 
     async def send_new_items(
         self,
@@ -822,7 +820,6 @@ class APTracker(Extension):
                             await self.sync_cheese(player, multiworld)
                     except BadAPIKeyException:
                         player_settings.cheese_api_key = None
-                        self.save()
                         await player.send("Failed to authenticate with Cheese Tracker.  Please reauthenticate with `/ap authenticate`")
                 cheese_dash = []
 
@@ -840,7 +837,7 @@ class APTracker(Extension):
                             continue
                         if tracker.id in ids:
                             self.remove_tracker(player, tracker)
-                            self.save()
+                            await self.save()
                             continue
                         urls.add(tracker.url)
                         if tracker.id:
@@ -917,10 +914,9 @@ class APTracker(Extension):
                             if "webtracker" in multiworld.agents:
                                 await asyncio.sleep(3)  # Webtrackers are slow
                             else:
-                                await asyncio.sleep(1)
+                                await asyncio.sleep(2)
                         else:
-                            # if we didn't check anything, we don't need to wait
-                            await asyncio.sleep(1)
+                            await asyncio.sleep(2)
                     except Exception as e:
                         logging.error(f"Error occurred while processing tracker {tracker.id} for user {user}: {e}")
                         sentry_sdk.capture_exception(e)
@@ -928,7 +924,7 @@ class APTracker(Extension):
                 if trackers:
                     user_count += 1
                 if progress > 100:
-                    self.save()
+                    await self.save()
                     progress = 0
             except Exception as e:
                 sentry_sdk.capture_exception(e)
@@ -963,7 +959,7 @@ class APTracker(Extension):
         self.user_count = user_count
         self.stats["games"] = games
         self.stats["agents"] = dict(agents)
-        self.save()
+        await self.save()
         activity = Activity(name=f"{tracker_count} slots across {user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
         task_logger.info(f"Completed refresh_all task {task_id}: {tracker_count} trackers for {user_count} users")
@@ -983,22 +979,22 @@ class APTracker(Extension):
             self.datapackages[game].items[item] = ItemClassification.unknown
         return self.datapackages[game].items[item]
 
-    def save(self):
+    async def save(self):
         trackers = json.dumps(converter.unstructure(self.trackers), indent=2)
-        with open("trackers.json", "w") as f:
-            f.write(trackers)
+        async with aiofiles.open("trackers.json", "w") as f:
+            await f.write(trackers)
         cheese = json.dumps(converter.unstructure(self.cheese), indent=2)
-        with open("cheese.json", "w") as f:
-            f.write(cheese)
+        async with aiofiles.open("cheese.json", "w") as f:
+            await f.write(cheese)
         dp = json.dumps(converter.unstructure(self.datapackages), indent=2)
-        with open("gamedata.json", "w") as f:
-            f.write(dp)
+        async with aiofiles.open("gamedata.json", "w") as f:
+            await f.write(dp)
         players = json.dumps(converter.unstructure(self.players), indent=2)
-        with open("players.json", "w") as f:
-            f.write(players)
+        async with aiofiles.open("players.json", "w") as f:
+            await f.write(players)
         stats = json.dumps(self.stats, indent=2)
-        with open("stats.json", "w") as f:
-            f.write(stats)
+        async with aiofiles.open("stats.json", "w") as f:
+            await f.write(stats)
 
     def load(self):
         if os.path.exists("trackers.json"):
