@@ -213,7 +213,6 @@ class APTracker(Extension):
 
         if not games:
             await ctx.send("No new items", ephemeral=True)
-            await self.save()
             return
 
         n = 0
@@ -226,7 +225,6 @@ class APTracker(Extension):
 
         for tracker, items in games.items():
             await self.try_classify(ctx, tracker, items, ephemeral=ephemeral)
-        await self.save()
 
     @ap.subcommand("authenticate")
     @slash_option("api_key", "Your Cheese Tracker API key", OptionType.STRING, required=True)
@@ -937,7 +935,7 @@ class APTracker(Extension):
 
                 if trackers:
                     user_count += 1
-                if progress > 100:
+                if progress > 500:
                     self.stats["running_refresh"] = {
                         "task_id": task_id,
                         "current_user": user_count,
