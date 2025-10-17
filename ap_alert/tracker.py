@@ -247,7 +247,6 @@ class APTracker(Extension):
 
         if not games:
             await ctx.send("No new items", ephemeral=True)
-            await self.save()
             return
 
         n = 0
@@ -260,7 +259,6 @@ class APTracker(Extension):
 
         for tracker, items in games.items():
             await self.try_classify(ctx, tracker, items, ephemeral=ephemeral)
-        await self.save()
 
     @ap.subcommand("authenticate")
     @slash_option("api_key", "Your Cheese Tracker API key", OptionType.STRING, required=True)
@@ -450,7 +448,7 @@ class APTracker(Extension):
             elif tracker.progression_status == ProgressionStatus.go or tracker.progression_status == ProgressionStatus.unblocked:
                 colour = ButtonStyle.GREEN
             if tracker.cheese_id == -1:
-                tracker.cheese_id = min(trackers, key=lambda x: x.cheese_id).cheese_id - 1
+                tracker.cheese_id = min(trackers, key=lambda x: x.cheese_id or 0).cheese_id - 1
 
             buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.cheese_id}"))
         buttons.sort(key=lambda x: x.style)
@@ -848,7 +846,7 @@ class APTracker(Extension):
         players.extend(self.tracker_db.distinct("user_id"))
         return players
 
-    @Task.create(IntervalTrigger(hours=6))
+    @Task.create(IntervalTrigger(hours=3))
     async def refresh_all(self) -> BaseTrigger | None:
         task_id = self.refresh_all.iteration
         start_time = datetime.datetime.now(tz=datetime.UTC)
@@ -980,11 +978,12 @@ class APTracker(Extension):
                         else:
                             await asyncio.sleep(0)
                     except Exception as e:
-                        logging.error(f"Error occurred while processing tracker {tracker._id} for user {user}: {e}")
+                        logging.error(f"Error occurred while processing tracker {tracker.cheese_id} for user {user}: {e}")
                         sentry_sdk.capture_exception(e)
 
                 if trackers:
                     user_count += 1
+                if progress > 500:
                     self.stats["running_refresh"] = {
                         "task_id": task_id,
                         "current_user": user_count,
@@ -1046,8 +1045,11 @@ class APTracker(Extension):
         return self.datapackages[game].items[item]
 
     async def save(self):
-        task_logger.info("Saving tracker data to disk")
+        if datetime.datetime.now(tz=datetime.UTC) - self.last_save < datetime.timedelta(seconds=60):
+            return
         trackers = json.dumps(converter.unstructure(self.old_trackers), indent=2)
+        self.last_save = datetime.datetime.now(tz=datetime.UTC)
+        task_logger.debug("Saving tracker data to disk")
         async with aiofiles.open("trackers.json", "w") as f:
             await f.write(trackers)
         cheese = json.dumps(converter.unstructure(self.cheese), indent=2)
@@ -1061,7 +1063,7 @@ class APTracker(Extension):
         async with aiofiles.open("stats.json", "w") as f:
             await f.write(stats)
         self.tracker_db.flush()
-        task_logger.info("Finished saving tracker data to disk")
+        task_logger.debug("Finished saving tracker data to disk")
 
     def load(self):
         try:
@@ -1094,6 +1096,7 @@ class APTracker(Extension):
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
+        self.last_save = datetime.datetime.now(tz=datetime.UTC)
 
 
 def recolour_buttons(components: list[ActionRow]) -> list[Button]:
