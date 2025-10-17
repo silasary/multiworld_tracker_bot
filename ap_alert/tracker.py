@@ -55,7 +55,7 @@ from .multiworld import (
 from .worlds import TRACKERS
 
 task_logger = logging.getLogger("ap_alert.tasks")
-task_logger.setLevel(logging.INFO)
+task_logger.setLevel(logging.DEBUG)
 
 regex_dash = re.compile(r"dash:(-?\d+)")
 regex_unblock = re.compile(r"unblock:(\d+)")
@@ -805,6 +805,7 @@ class APTracker(Extension):
         queue = list(self.trackers.items())
         random.shuffle(queue)
         for user, trackers in queue:
+            task_logger.debug(f"Processing user {user}")
             try:
                 player = await self.bot.fetch_user(user)
                 if not player:
@@ -826,6 +827,7 @@ class APTracker(Extension):
                 urls = set()
                 ids = set()
                 for tracker in trackers:
+                    task_logger.debug(f"Processing tracker {tracker.url} for user {user}")
                     try:
                         if tracker.failures >= 10:
                             self.remove_tracker(player, tracker)
@@ -910,6 +912,7 @@ class APTracker(Extension):
                         tracker_count += 1
                         progress += 1
                         games[tracker.game] = games.get(tracker.game, 0) + 1
+                        task_logger.debug(f"Finished processing tracker {tracker.url} for user {user}")
                         if should_check:
                             if "webtracker" in multiworld.agents:
                                 await asyncio.sleep(3)  # Webtrackers are slow
@@ -967,7 +970,7 @@ class APTracker(Extension):
 
         hours = int(max(1, tracker_count // 3600 + 1))
         if isinstance(trigger, IntervalTrigger) and int(trigger.delta.total_seconds() // 3600) != hours:
-            task_logger.info(f"Adjusted refresh_all interval to {trigger.delta}")
+            task_logger.info(f"Adjusted refresh_all interval to {hours} hours")
             return IntervalTrigger(hours=hours)
         return None
 
@@ -980,6 +983,7 @@ class APTracker(Extension):
         return self.datapackages[game].items[item]
 
     async def save(self):
+        task_logger.info("Saving tracker data to disk")
         trackers = json.dumps(converter.unstructure(self.trackers), indent=2)
         async with aiofiles.open("trackers.json", "w") as f:
             await f.write(trackers)
@@ -995,6 +999,7 @@ class APTracker(Extension):
         stats = json.dumps(self.stats, indent=2)
         async with aiofiles.open("stats.json", "w") as f:
             await f.write(stats)
+        task_logger.info("Finished saving tracker data to disk")
 
     def load(self):
         if os.path.exists("trackers.json"):
