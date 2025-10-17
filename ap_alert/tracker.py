@@ -796,7 +796,7 @@ class APTracker(Extension):
                 self.get_trackers(player.id).remove(t)
                 return
 
-    @Task.create(IntervalTrigger(hours=6))
+    @Task.create(IntervalTrigger(hours=3))
     async def refresh_all(self) -> BaseTrigger | None:
         task_id = self.refresh_all.iteration
         start_time = datetime.datetime.now(tz=datetime.UTC)
