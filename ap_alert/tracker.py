@@ -927,8 +927,10 @@ class APTracker(Extension):
                                 await asyncio.sleep(3)  # Webtrackers are slow
                             else:
                                 await asyncio.sleep(2)
-                        else:
+                        elif "webtracker" in multiworld.agents:
                             await asyncio.sleep(2)
+                        else:
+                            await asyncio.sleep(0)
                     except Exception as e:
                         logging.error(f"Error occurred while processing tracker {tracker.id} for user {user}: {e}")
                         sentry_sdk.capture_exception(e)
