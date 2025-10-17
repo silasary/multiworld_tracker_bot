@@ -1,4 +1,5 @@
-from ap_alert.multiworld import MULTIWORLDS_BY_CHEESE, Filters, HintFilters, Multiworld
+from ap_alert.models.enums import Filters, HintFilters
+from ap_alert.multiworld import MULTIWORLDS_BY_CHEESE, Multiworld
 from shared.exceptions import BadAPIKeyException
 
 

@@ -36,7 +36,11 @@ from interactions.models.internal.application_commands import OptionType, integr
 from interactions.models.internal.tasks import IntervalTrigger, Task
 from requests.structures import CaseInsensitiveDict
 
-from .models.enums import CompletionStatus, ProgressionStatus
+from .models.network_item import NetworkItem
+
+from .models.tracked_game import TrackedGame
+
+from .models.enums import CompletionStatus, Filters, HintFilters, ProgressionStatus
 
 from .models.player import Player
 from ap_alert.converter import converter
@@ -48,12 +52,8 @@ from . import external_data
 from .multiworld import (
     GAMES,
     Datapackage,
-    Filters,
-    HintFilters,
     ItemClassification,
     Multiworld,
-    NetworkItem,
-    TrackedGame,
 )
 from .worlds import TRACKERS
 
@@ -496,8 +496,8 @@ class APTracker(Extension):
         embed.add_field("Progression Status", f"{tracker.progression_status.name} (Last Checked: {last_activity})")
         components = []
 
-        components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji="💼", custom_id=f"inv:{tracker.cheese_id}"))
-        components.append(Button(style=ButtonStyle.GREY, label="Settings", emoji="⚙️", custom_id=f"settings:{tracker.cheese_id}"))
+        components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji=":briefcase:", custom_id=f"inv:{tracker.cheese_id}"))
+        components.append(Button(style=ButtonStyle.GREY, label="Settings", emoji=":gear:", custom_id=f"settings:{tracker.cheese_id}"))
         if multiworld and multiworld.room_link:
             components.append(Button(style=ButtonStyle.URL, label="Open Room", url=multiworld.room_link))
 
@@ -521,9 +521,9 @@ class APTracker(Extension):
                 components.append(Button(style=ButtonStyle.RED, label="BK", custom_id=f"bk:{tracker.cheese_id}"))
 
         if not is_owner or only_game:
-            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji="🗑️", custom_id=f"remove:{tracker.cheese_id}"))
+            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji=":wastebasket:", custom_id=f"remove:{tracker.cheese_id}"))
         else:
-            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji="🗑️", custom_id=f"disable:{tracker.cheese_id}"))
+            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji=":wastebasket:", custom_id=f"disable:{tracker.cheese_id}"))
         embeds = [embed]
         if TRACKERS.get(tracker.game) and (dash := await TRACKERS[tracker.game].build_dashboard(tracker)):
             embeds.append(dash)
