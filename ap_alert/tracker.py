@@ -800,6 +800,7 @@ class APTracker(Extension):
     @Task.create(IntervalTrigger(hours=6))
     async def refresh_all(self) -> BaseTrigger | None:
         task_id = self.refresh_all.iteration
+        start_time = datetime.datetime.now(tz=datetime.UTC)
         self.stats["running_refresh"] = {
             "task_id": task_id,
         }
@@ -979,7 +980,8 @@ class APTracker(Extension):
         await self.save()
         activity = Activity(name=f"{tracker_count} slots across {user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
-        task_logger.info(f"Completed refresh_all task {task_id}: {tracker_count} trackers for {user_count} users")
+        time_taken = datetime.datetime.now(tz=datetime.UTC) - start_time
+        task_logger.info(f"Completed refresh_all task {task_id}: {tracker_count} trackers for {user_count} users in {time_taken}")
         trigger = self.refresh_all.trigger
 
         hours = int(max(1, tracker_count // 3600 + 1))
