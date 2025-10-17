@@ -921,12 +921,13 @@ class APTracker(Extension):
                         tracker_count += 1
                         progress += 1
                         games[tracker.game] = games.get(tracker.game, 0) + 1
-                        task_logger.debug(f"Finished processing tracker {tracker.url} for user {user}")
+                        used_agents = ", ".join(k for k in multiworld.agents if multiworld.agents[k].enabled)
+                        task_logger.debug(f"Finished processing tracker {tracker.url} for user {user} (using agents: {used_agents})")
                         if should_check:
                             if "webtracker" in multiworld.agents:
                                 await asyncio.sleep(3)  # Webtrackers are slow
                             else:
-                                await asyncio.sleep(2)
+                                await asyncio.sleep(0.5)
                         elif "webtracker" in multiworld.agents:
                             await asyncio.sleep(2)
                         else:
