@@ -442,6 +442,10 @@ class APTracker(Extension):
                 name = name + port
 
         dp = self.datapackages.get(tracker.game)
+        if dp is None:
+            dp = Datapackage(game_name=tracker.game)
+            await external_data.import_datapackage(tracker.game, dp)
+            self.datapackages[tracker.game] = dp
 
         last_refreshed = format_relative_time(tracker.last_refresh) or "Never"
         last_item_name = f"{dp.icon(tracker.last_item[0])} {tracker.last_item[0]}" if tracker.last_item[0] else ""
