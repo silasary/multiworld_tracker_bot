@@ -12,6 +12,7 @@ import attrs
 from bs4 import BeautifulSoup, Tag
 
 from ap_alert.models.enums import ProgressionStatus, HintClassification, HintUpdate, TrackerStatus, CompletionStatus
+from archipelagopy import netutils
 from archipelagopy.utils import fetch_datapackage_from_webhost
 from world_data.models import Datapackage, ItemClassification
 
@@ -650,11 +651,13 @@ class ApiTrackerAgent(BaseAgent):
             if self.mw.player_items_received is None:
                 return False
         new_items: list[NetworkItem] = []
-        api_items = self.mw.player_items_received[slot.slot_id - 1]["items"]
+        api_items: list[netutils.NetworkItem] = next((i["items"] for i in self.mw.player_items_received if i["player"] == slot.slot_id), [])
 
-        # new_items = [NetworkItem(i["item"], slot.game, i["count"], ItemClassification.from_network_flag(i['flags'])) for i in api_items if i["order"] > slot.latest_item]
         if len(api_items) - 1 == slot.latest_item:
             return False
+        elif len(api_items) - 1 < slot.latest_item:
+            logging.error(f"Rollback detected in {slot.url}")
+            slot.latest_item = -1
 
         checksum = self.mw.static_tracker_data["datapackage"].get(slot.game, {}).get("checksum")
         if checksum:
@@ -668,12 +671,12 @@ class ApiTrackerAgent(BaseAgent):
         if "item_id_to_name" not in ap_datapackage:
             ap_datapackage["item_id_to_name"] = {v: k for k, v in ap_datapackage.get("item_name_to_id", {}).items()}
 
-        for index, i in enumerate(api_items, start=0):
+        for index, netitem in enumerate(api_items, start=0):
             if index > slot.latest_item:
-                item_id = i[0]
-                #  location = i[1]
-                #  sender = i[2]
-                flags = i[3] if len(i) > 3 else 0
+                item_id = netitem[0]
+                #  location = netitem[1]
+                #  sender = netitem[2]
+                flags = netitem[3] if len(netitem) > 3 else 0
 
                 item_name = ap_datapackage["item_id_to_name"].get(item_id, str(item_id))
                 item = NetworkItem(item_name, slot.game, 1, ItemClassification.from_network_flag(flags))
