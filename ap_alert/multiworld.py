@@ -376,9 +376,10 @@ class ApiTrackerAgent(BaseAgent):
 
         if len(api_items) - 1 == slot.latest_item:
             return False
-        elif len(api_items) - 1 < slot.latest_item:
+        elif len(api_items) < slot.latest_item:
             logging.error(f"Rollback detected in {slot.url}")
-            slot.latest_item = -1
+            slot.latest_item = len(api_items) - 1
+            return False
 
         checksum = self.mw.static_tracker_data["datapackage"].get(slot.game, {}).get("checksum")
         if checksum:
