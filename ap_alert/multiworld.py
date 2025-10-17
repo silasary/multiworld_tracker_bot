@@ -657,7 +657,10 @@ class ApiTrackerAgent(BaseAgent):
             return False
 
         checksum = self.mw.static_tracker_data["datapackage"].get(slot.game, {}).get("checksum")
-        ap_datapackage = await fetch_datapackage_from_webhost(slot.game, checksum)
+        if checksum:
+            ap_datapackage = await fetch_datapackage_from_webhost(slot.game, checksum)
+        else:
+            ap_datapackage = None
         if not ap_datapackage:
             logging.warning(f"Could not load datapackage for game {slot.game} with checksum {checksum}")
             self.enabled = False
