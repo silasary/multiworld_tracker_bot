@@ -43,7 +43,7 @@ from .models.player import Player
 from ap_alert.converter import converter
 from discordbot.db import db
 from shared.exceptions import BadAPIKeyException
-from shared.mongocache import MongoCache
+from shared.automongocache import MongoCache
 
 from . import external_data
 from .multiworld import (
