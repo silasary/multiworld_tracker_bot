@@ -3,7 +3,7 @@ from interactions import Embed
 
 
 if TYPE_CHECKING:
-    from ap_alert.multiworld import TrackedGame
+    from ap_alert.models.tracked_game import TrackedGame
 
 
 from .base import CustomTracker

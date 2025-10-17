@@ -3,7 +3,7 @@ from world_data.models import ItemClassification
 from .base import CustomTracker
 
 if typing.TYPE_CHECKING:
-    from ap_alert.multiworld import TrackedGame
+    from ap_alert.models.tracked_game import TrackedGame
 
 
 class SlotLock(CustomTracker):
