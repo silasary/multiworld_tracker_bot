@@ -352,7 +352,7 @@ class APTracker(Extension):
         if len(names) == 1:
             components = []
             if tracker.filters == Filters.unset:
-                components.append(Button(style=ButtonStyle.GREY, label="Configure Filters", emoji="⚙️", custom_id=f"settings:{tracker.id}"))
+                components.append(Button(style=ButtonStyle.GREY, label="Configure Filters", emoji="⚙️", custom_id=f"settings:{tracker.cheese_id}"))
             await ctx_or_user.send(f"{slot_name}: {names[0]}", ephemeral=ephemeral, components=components)
         elif len(names) > 10:
             text = f"{slot_name}:\n"
@@ -415,10 +415,10 @@ class APTracker(Extension):
                 colour = ButtonStyle.RED
             elif tracker.progression_status == ProgressionStatus.go or tracker.progression_status == ProgressionStatus.unblocked:
                 colour = ButtonStyle.GREEN
-            if tracker.id == -1:
-                tracker.id = min(trackers, key=lambda x: x.id).id - 1
+            if tracker.cheese_id == -1:
+                tracker.cheese_id = min(trackers, key=lambda x: x.cheese_id or 0).cheese_id - 1
 
-            buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.id}"))
+            buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.cheese_id}"))
         buttons.sort(key=lambda x: x.style)
         pages = chunk(buttons, 25)
         for page in pages:
@@ -428,7 +428,7 @@ class APTracker(Extension):
     async def dashboard_embed(self, ctx: ComponentContext) -> Embed:
         await ctx.defer(ephemeral=True)
         m = regex_dash.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return Embed(title="Game not found")
 
@@ -462,8 +462,8 @@ class APTracker(Extension):
         embed.add_field("Progression Status", f"{tracker.progression_status.name} (Last Checked: {last_activity})")
         components = []
 
-        components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji=":briefcase:", custom_id=f"inv:{tracker.id}"))
-        components.append(Button(style=ButtonStyle.GREY, label="Settings", emoji=":gear:", custom_id=f"settings:{tracker.id}"))
+        components.append(Button(style=ButtonStyle.GREY, label="Inventory", emoji=":briefcase:", custom_id=f"inv:{tracker.cheese_id}"))
+        components.append(Button(style=ButtonStyle.GREY, label="Settings", emoji=":gear:", custom_id=f"settings:{tracker.cheese_id}"))
         if multiworld and multiworld.room_link:
             components.append(Button(style=ButtonStyle.URL, label="Open Room", url=multiworld.room_link))
 
@@ -477,19 +477,19 @@ class APTracker(Extension):
         # aged = check_time < datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=1)
         if is_owner:
             if tracker.progression_status == ProgressionStatus.bk:
-                components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
-                components.append(Button(style=ButtonStyle.RED, label="Still BK", custom_id=f"bk:{tracker.id}"))
+                components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.cheese_id}"))
+                components.append(Button(style=ButtonStyle.RED, label="Still BK", custom_id=f"bk:{tracker.cheese_id}"))
             elif tracker.progression_status == ProgressionStatus.soft_bk:
-                components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
-                components.append(Button(style=ButtonStyle.RED, label="Still Soft BK", custom_id=f"bk:{tracker.id}"))
+                components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.cheese_id}"))
+                components.append(Button(style=ButtonStyle.RED, label="Still Soft BK", custom_id=f"bk:{tracker.cheese_id}"))
             elif tracker.progression_status in [ProgressionStatus.unblocked, ProgressionStatus.unknown]:
-                components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.id}"))
-                components.append(Button(style=ButtonStyle.RED, label="BK", custom_id=f"bk:{tracker.id}"))
+                components.append(Button(style=ButtonStyle.GREEN, label="Unblocked", custom_id=f"unblock:{tracker.cheese_id}"))
+                components.append(Button(style=ButtonStyle.RED, label="BK", custom_id=f"bk:{tracker.cheese_id}"))
 
         if not is_owner or only_game:
-            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji=":wastebasket:", custom_id=f"remove:{tracker.id}"))
+            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji=":wastebasket:", custom_id=f"remove:{tracker.cheese_id}"))
         else:
-            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji=":wastebasket:", custom_id=f"disable:{tracker.id}"))
+            components.append(Button(style=ButtonStyle.GREY, label="Remove", emoji=":wastebasket:", custom_id=f"disable:{tracker.cheese_id}"))
         embeds = [embed]
         if TRACKERS.get(tracker.game) and (dash := await TRACKERS[tracker.game].build_dashboard(tracker)):
             embeds.append(dash)
@@ -499,7 +499,7 @@ class APTracker(Extension):
     async def remove(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_remove.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         self.get_trackers(ctx.author_id).remove(tracker)
@@ -509,7 +509,7 @@ class APTracker(Extension):
     async def disable(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_disable.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         tracker.disabled = True
@@ -519,7 +519,7 @@ class APTracker(Extension):
     async def unblock(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_unblock.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         multiworld = self.cheese[tracker.tracker_id]
@@ -536,7 +536,7 @@ class APTracker(Extension):
     async def still_bk(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_bk.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         multiworld = self.cheese[tracker.tracker_id]
@@ -552,7 +552,7 @@ class APTracker(Extension):
     async def inventory(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_inv.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         if not tracker.all_items:
@@ -564,7 +564,7 @@ class APTracker(Extension):
     async def settings(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True, edit_origin=False)
         m = regex_settings.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         multiworld = self.cheese[tracker.tracker_id]
@@ -578,13 +578,13 @@ class APTracker(Extension):
             colour = ButtonStyle.GREY
             if value == tracker.filters:
                 colour = ButtonStyle.GREEN
-            return Button(style=colour, label=name, custom_id=f"filter:{tracker.id}:{value.value}")
+            return Button(style=colour, label=name, custom_id=f"filter:{tracker.cheese_id}:{value.value}")
 
         def hint_filter_button(name: str, value: HintFilters):
             colour = ButtonStyle.GREY
             if value == tracker.hint_filters:
                 colour = ButtonStyle.GREEN
-            return Button(style=colour, label=name, custom_id=f"hint_filter:{tracker.id}:{value.value}")
+            return Button(style=colour, label=name, custom_id=f"hint_filter:{tracker.cheese_id}:{value.value}")
 
         components = [
             TextDisplayComponent(f"# {name}"),
@@ -624,7 +624,7 @@ class APTracker(Extension):
             await ctx.send("Default filter updated", ephemeral=True)
             return
 
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         tracker.filters = Filters(int(m.group(2)))
@@ -640,7 +640,7 @@ class APTracker(Extension):
             await ctx.send("Default hint filter updated", ephemeral=True)
             return
 
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.id == int(m.group(1))), None)
+        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         tracker.hint_filters = HintFilters(int(m.group(2)))
@@ -845,13 +845,13 @@ class APTracker(Extension):
                         if tracker.url in urls:
                             self.remove_tracker(player, tracker)
                             continue
-                        if tracker.id in ids:
+                        if tracker.cheese_id in ids:
                             self.remove_tracker(player, tracker)
                             await self.save()
                             continue
                         urls.add(tracker.url)
-                        if tracker.id:
-                            ids.add(tracker.id)
+                        if tracker.cheese_id:
+                            ids.add(tracker.cheese_id)
                         try:
                             multiworld, _found = await self.sync_cheese(player, tracker.multitracker_url)
                         except IndexError:
@@ -910,7 +910,7 @@ class APTracker(Extension):
                                 if hints:
                                     components = []
                                     if tracker.hint_filters == HintFilters.unset:
-                                        components.append(Button(style=ButtonStyle.GREY, label="Configure Hint Filters", emoji="⚙️", custom_id=f"settings:{tracker.id}"))
+                                        components.append(Button(style=ButtonStyle.GREY, label="Configure Hint Filters", emoji="⚙️", custom_id=f"settings:{tracker.cheese_id}"))
                                     await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints], components=components)
                             except Forbidden:
                                 logging.error(f"Failed to send message to {player.global_name} ({player.id})")
@@ -932,7 +932,7 @@ class APTracker(Extension):
                         else:
                             await asyncio.sleep(0)
                     except Exception as e:
-                        logging.error(f"Error occurred while processing tracker {tracker.id} for user {user}: {e}")
+                        logging.error(f"Error occurred while processing tracker {tracker.cheese_id} for user {user}: {e}")
                         sentry_sdk.capture_exception(e)
 
                 if trackers:

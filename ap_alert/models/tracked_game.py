@@ -21,7 +21,8 @@ import logging
 @attrs.define()
 class TrackedGame:
     url: str  # https://archipelago.gg/tracker/tracker_id/0/slot_id
-    id: int = -1
+    _id: str | None = None
+    cheese_id: int = -1
     latest_item: int = -1
     disabled: bool = False
 
@@ -97,7 +98,7 @@ class TrackedGame:
 
     def update(self, data: "CheeseGame") -> None:
         self.game = data.game
-        self.id = data.id
+        self.cheese_id = data.id
         self.progression_status = ProgressionStatus(data.progression_status)
         self.last_checked = data.last_checked
         self.last_activity = data.last_activity
@@ -112,8 +113,8 @@ class TrackedGame:
         elif filters == HintFilters.unset:
             filters = HintFilters.all
         updated = []
-        finder_hints = [Hint(**h, is_finder=True) for h in data if h.get("finder_game_id") == self.id]
-        receiver_hints = [Hint(**h, is_finder=False) for h in data if h.get("receiver_game_id") == self.id and h.get("finder_game_id") != self.id]
+        finder_hints = [Hint(**h, is_finder=True) for h in data if h.get("finder_game_id") == self.cheese_id]
+        receiver_hints = [Hint(**h, is_finder=False) for h in data if h.get("receiver_game_id") == self.cheese_id and h.get("finder_game_id") != self.cheese_id]
         for hint in finder_hints:
             if hint.id not in self.finder_hints:
                 self.finder_hints[hint.id] = hint
