@@ -12,7 +12,7 @@ import attrs
 from bs4 import BeautifulSoup, Tag
 
 from ap_alert.models.enums import ProgressionStatus, HintClassification, HintUpdate, TrackerStatus, CompletionStatus
-from archipelagopy.netutils import fetch_datapackage_from_webhost
+from archipelagopy.utils import fetch_datapackage_from_webhost
 from world_data.models import Datapackage, ItemClassification
 
 
