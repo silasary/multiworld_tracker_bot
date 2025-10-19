@@ -328,7 +328,7 @@ class APTracker(Extension):
                 emoji = "<:filler:1277502385459171338>"
             if classification == ItemClassification.useful:
                 emoji = "<:useful:1277502389729103913>"
-            if classification == ItemClassification.progression:
+            if classification == ItemClassification.progression or classification == ItemClassification.progression | ItemClassification.useful:
                 emoji = "<:progression:1277502382682542143>"
             if classification == ItemClassification.trap:
                 emoji = "❌"
