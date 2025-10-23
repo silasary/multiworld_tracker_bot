@@ -120,6 +120,7 @@ class APTracker(Extension):
     @listen()
     async def on_disconnect(self) -> None:
         await self.save()
+        await external_data.update_datapackage()
 
     @slash_command("ap")
     @integration_types(guild=True, user=True)
