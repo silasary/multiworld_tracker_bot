@@ -297,9 +297,9 @@ class WebTrackerAgent(BaseAgent):
 
         new_items: list[NetworkItem] = []
         for r in rows:
-            slot.all_items[r[index_item]] = r[index_amount]
+            item = NetworkItem(r[index_item], slot.game, r[index_amount])
+            slot.all_items.append(item)
             if r[index_order] > slot.latest_item:
-                item = NetworkItem(r[index_item], slot.game, 1)
                 new_items.append(item)
                 if DATAPACKAGES.get(slot.game) is not None:
                     classification = DATAPACKAGES[slot.game].items.setdefault(r[index_item], ItemClassification.unknown)
@@ -367,16 +367,17 @@ class ApiTrackerAgent(BaseAgent):
         self.mw.player_items_received = data.get("player_items_received", [])
 
     async def refresh_game(self, slot: TrackedGame) -> bool:
-        if self.mw.player_items_received is None:
+        if self.mw.player_items_received is None or not slot.all_items:
             await self.refresh()
             if self.mw.player_items_received is None:
                 return False
         new_items: list[NetworkItem] = []
+        all_items: list[NetworkItem] = []
         api_items: list[netutils.NetworkItem] = next((i["items"] for i in self.mw.player_items_received if i["player"] == slot.slot_id), [])
 
-        if len(api_items) - 1 == slot.latest_item:
+        if len(api_items) - 1 == slot.latest_item and slot.all_items:
             return False
-        elif len(api_items) < slot.latest_item:
+        if len(api_items) < slot.latest_item:
             logging.error(f"Rollback detected in {slot.url}")
             slot.latest_item = len(api_items) - 1
             return False
@@ -394,20 +395,22 @@ class ApiTrackerAgent(BaseAgent):
             ap_datapackage["item_id_to_name"] = {v: k for k, v in ap_datapackage.get("item_name_to_id", {}).items()}
 
         for index, netitem in enumerate(api_items, start=0):
-            if index > slot.latest_item:
-                item_id = netitem[0]
-                #  location = netitem[1]
-                #  sender = netitem[2]
-                flags = netitem[3] if len(netitem) > 3 else 0
+            item_id = netitem[0]
+            #  location = netitem[1]
+            #  sender = netitem[2]
+            flags = netitem[3] if len(netitem) > 3 else 0
 
-                item_name = ap_datapackage["item_id_to_name"].get(item_id, str(item_id))
-                classification = ItemClassification.from_network_flag(flags)
-                classification = DATAPACKAGES[slot.game].postprocess_item_classification(item_name, classification)
-                item = NetworkItem(item_name, slot.game, 1, classification)
+            item_name = ap_datapackage["item_id_to_name"].get(item_id, str(item_id))
+            classification = ItemClassification.from_network_flag(flags)
+            classification = DATAPACKAGES[slot.game].postprocess_item_classification(item_name, classification)
+            item = NetworkItem(item_name, slot.game, 1, classification)
+            all_items.append(item)
+            if index > slot.latest_item:
                 new_items.append(item)
                 if item.classification in [ItemClassification.progression, ItemClassification.mcguffin]:
                     slot.last_progression = (item_name, datetime.datetime.now(tz=datetime.UTC))
 
+        slot.all_items = all_items
         if not new_items:
             return False
 

@@ -12,7 +12,7 @@ from .base import CustomTracker
 class OsuTracker(CustomTracker):
     async def build_dashboard(self, tracker: "TrackedGame") -> Embed:
         unplayed = set([song[:-9] for song, complete in tracker.checks.items() if not complete])
-        recieved = set(tracker.all_items.keys())
+        recieved = set(i.name for i in tracker.all_items)
         unlocked = unplayed & recieved
         return Embed(
             title="Osu!",

@@ -323,7 +323,7 @@ class APTracker(Extension):
                 await self.try_classify(ctx_or_user, tracker, new_items)
                 classification = self.datapackages[tracker.game].items[item.name]
             if classification == ItemClassification.mcguffin:
-                emoji = "✨"
+                emoji = ":sparkles:"
             if classification == ItemClassification.filler:
                 emoji = "<:filler:1277502385459171338>"
             if classification == ItemClassification.useful:
@@ -331,7 +331,7 @@ class APTracker(Extension):
             if classification == ItemClassification.progression or classification == ItemClassification.progression | ItemClassification.useful:
                 emoji = "<:progression:1277502382682542143>"
             if classification == ItemClassification.trap:
-                emoji = "❌"
+                emoji = ":x:"
             if classification == ItemClassification.progression | ItemClassification.trap:
                 emoji = "<:prog_trap:1428702147435954237>"
 
@@ -340,7 +340,12 @@ class APTracker(Extension):
             return f"{emoji} {item.name}"
 
         if inventory:
-            new_items = list(NetworkItem(i, tracker.game, tracker.all_items[i]) for i in tracker.all_items)
+            new_items = tracker.all_items.copy()
+            merged = Counter()
+            for item in new_items:
+                merged[(item.name, item.classification)] += item.quantity
+            new_items = [NetworkItem(name=k[0], game=tracker.game, quantity=v, flags=k[1]) for (k, v) in merged.items()]
+
         else:
             new_items = tracker.notification_queue.copy()
 

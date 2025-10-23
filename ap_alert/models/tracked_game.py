@@ -40,7 +40,7 @@ class TrackedGame:
     last_checked: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
     last_activity: datetime.datetime = attrs.field(factory=lambda: datetime.datetime.fromisoformat("1970-01-01T00:00:00Z"))
 
-    all_items: dict[str, int] = attrs.field(factory=dict, init=False, repr=False)
+    all_items: list[NetworkItem] = attrs.field(factory=list, init=False, repr=False)
     new_items: list[NetworkItem] = attrs.field(factory=list, init=False)
 
     checks: dict[str, bool] = attrs.field(factory=dict, repr=False)
