@@ -401,7 +401,9 @@ class ApiTrackerAgent(BaseAgent):
                 flags = netitem[3] if len(netitem) > 3 else 0
 
                 item_name = ap_datapackage["item_id_to_name"].get(item_id, str(item_id))
-                item = NetworkItem(item_name, slot.game, 1, ItemClassification.from_network_flag(flags))
+                classification = ItemClassification.from_network_flag(flags)
+                classification = DATAPACKAGES[slot.game].postprocess_item_classification(item_name, classification)
+                item = NetworkItem(item_name, slot.game, 1, classification)
                 new_items.append(item)
                 if item.classification in [ItemClassification.progression, ItemClassification.mcguffin]:
                     slot.last_progression = (item_name, datetime.datetime.now(tz=datetime.UTC))
