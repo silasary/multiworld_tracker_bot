@@ -19,6 +19,7 @@ from archipelagopy import netutils
 from archipelagopy.utils import fetch_datapackage_from_webhost
 from shared.bs_helpers import process_table
 from world_data.models import Datapackage, ItemClassification
+from shared.web import make_session
 
 
 @attrs.define()
@@ -85,7 +86,7 @@ class Multiworld:
         from .converter import converter
 
         game = converter.unstructure(game)  # convert datetime to isoformat
-        async with aiohttp.ClientSession() as session:
+        async with make_session() as session:
             async with session.put(f"{self.url}/game/{game['id']}", json=game) as response:
                 if response.status != 200:
                     raise aiohttp.ClientResponseError(
@@ -155,7 +156,7 @@ class CheeseAgent(BaseAgent):
             if self.mw.url.startswith("https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/"):
                 self.mw.cheese_url = self.mw.url
             else:
-                async with aiohttp.ClientSession() as session:
+                async with make_session() as session:
                     async with session.post(
                         "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
                         json={"url": self.mw.url},
@@ -167,7 +168,7 @@ class CheeseAgent(BaseAgent):
                 self.mw.cheese_url = f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}"
 
         logging.info(f"Refreshing {self.mw.cheese_url}")
-        async with aiohttp.ClientSession() as session:
+        async with make_session() as session:
             async with session.get(self.mw.cheese_url) as response:
                 txt = await response.text()
         data = json.loads(txt)
@@ -199,7 +200,7 @@ class WebTrackerAgent(BaseAgent):
         self.mw.ap_tracker_id = self.mw.url.split("/")[-1]
         logging.info(f"Refreshing cheeseless {self.mw.url}")
         multitracker_url = self.mw.url
-        async with aiohttp.ClientSession() as session:
+        async with make_session() as session:
             try:
                 async with session.get(multitracker_url) as response:
                     if response.status != 200:
@@ -243,7 +244,7 @@ class WebTrackerAgent(BaseAgent):
             await slot.refresh_metadata()
         logging.info(f"Refreshing {slot.url}")
         try:
-            async with aiohttp.ClientSession() as session:
+            async with make_session() as session:
                 async with session.get(slot.url) as response:
                     if response.status == 500 and "/tracker/" in slot.url:
                         slot.url = slot.url.replace("/tracker/", "/generic_tracker/")
@@ -338,7 +339,7 @@ class ApiTrackerAgent(BaseAgent):
             self.mw.ap_tracker_id = self.mw.url.split("/")[-1]
 
         logging.info(f"Refreshing API multiworld {self.mw.url}")
-        async with aiohttp.ClientSession() as session:
+        async with make_session() as session:
             if self.mw.static_tracker_data is None:
                 static_url = f"{self.mw.ap_scheme}://{self.mw.ap_hostname}/api/static_tracker/{self.mw.ap_tracker_id}"
                 async with session.get(static_url) as response:

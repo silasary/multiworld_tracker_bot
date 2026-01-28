@@ -4,12 +4,12 @@ from ap_alert.models.hint import Hint
 from ap_alert.models.cheese_game import CheeseGame
 from ap_alert.models.enums import Filters, HintClassification, HintFilters, HintUpdate, ProgressionStatus
 from shared.bs_helpers import process_table
+from shared.web import make_session
 
 if TYPE_CHECKING:
     from ap_alert.multiworld import Multiworld
 
 
-import aiohttp
 import attrs
 from bs4 import BeautifulSoup, Tag
 
@@ -66,7 +66,7 @@ class TrackedGame:
     async def refresh_metadata(self) -> None:
         logging.info(f"Refreshing metadata for {self.url}")
         multitracker_url = self.multitracker_url
-        async with aiohttp.ClientSession() as session:
+        async with make_session() as session:
             async with session.get(multitracker_url) as response:
                 if response.status != 200:
                     self.failures += 1

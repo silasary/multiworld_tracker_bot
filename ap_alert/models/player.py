@@ -3,9 +3,10 @@ from ap_alert.multiworld import MULTIWORLDS_BY_CHEESE, Multiworld
 from shared.exceptions import BadAPIKeyException
 
 
-import aiohttp
 import attrs
 import interactions
+
+from shared.web import make_session
 
 
 @attrs.define()
@@ -26,7 +27,7 @@ class Player:
         return self.name if self.name else self.mention
 
     async def get_trackers(self) -> list["Multiworld"]:
-        async with aiohttp.ClientSession() as session:
+        async with make_session() as session:
             headers = {"Authorization": f"Bearer {self.cheese_api_key}"} if self.cheese_api_key else {}
             async with session.get("https://cheesetrackers.theincrediblewheelofchee.se/api/dashboard/tracker", headers=headers) as response:
                 if response.status == 401:
