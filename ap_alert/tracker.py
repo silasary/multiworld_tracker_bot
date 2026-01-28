@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import itertools
+import shutil
 
 import aiofiles
 import sentry_sdk
@@ -1012,6 +1013,7 @@ class APTracker(Extension):
         self.last_save = datetime.datetime.now(tz=datetime.UTC)
         task_logger.debug("Saving tracker data to disk")
         trackers = json.dumps(converter.unstructure(self.trackers), indent=2)
+        shutil.copyfile("trackers.json", "trackers.json.bak")
         async with aiofiles.open("trackers.json", "w") as f:
             await f.write(trackers)
         cheese = json.dumps(converter.unstructure(self.cheese), indent=2)
@@ -1026,9 +1028,16 @@ class APTracker(Extension):
         task_logger.debug("Finished saving tracker data to disk")
 
     def load(self):
-        if os.path.exists("trackers.json"):
-            with open("trackers.json") as f:
-                self.trackers = converter.structure(json.loads(f.read()), dict[int, list[TrackedGame]])
+        try:
+            if os.path.exists("trackers.json"):
+                with open("trackers.json") as f:
+                    self.trackers = converter.structure(json.loads(f.read()), dict[int, list[TrackedGame]])
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            print(e)
+            if os.path.exists("trackers.json.bak"):
+                with open("trackers.json.bak") as f:
+                    self.trackers = converter.structure(json.loads(f.read()), dict[int, list[TrackedGame]])
         try:
             if os.path.exists("cheese.json"):
                 with open("cheese.json") as f:
