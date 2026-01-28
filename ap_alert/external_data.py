@@ -45,7 +45,7 @@ async def git_output(args: list[str], cwd: str) -> str:
         return output[0].decode("utf-8")
 
 
-@Task.create(IntervalTrigger(hours=24))
+@Task.create(IntervalTrigger(hours=6))
 async def update_datapackage() -> None:
     """Update the datapackage."""
     await clone_repo()
@@ -60,7 +60,7 @@ async def clone_repo() -> None:
         # await git(["reset", "--hard "origin/main"], cwd="world_data")
 
     else:
-        await git(["clone", repo_url, "world_data"])
+        await git(["clone", repo_url, "world_data"], cwd=".")
 
 
 async def update_all(dps: dict[str, Datapackage]) -> None:

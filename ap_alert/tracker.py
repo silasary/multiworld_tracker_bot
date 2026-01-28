@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import itertools
+import shutil
 
 import aiofiles
 from bson import ObjectId
@@ -156,6 +157,7 @@ class APTracker(Extension):
     @listen()
     async def on_disconnect(self) -> None:
         await self.save()
+        await external_data.update_datapackage()
 
     @slash_command("ap")
     @integration_types(guild=True, user=True)
@@ -357,22 +359,29 @@ class APTracker(Extension):
                 await self.try_classify(ctx_or_user, tracker, new_items)
                 classification = self.datapackages[tracker.game].items[item.name]
             if classification == ItemClassification.mcguffin:
-                emoji = "✨"
+                emoji = ":sparkles:"
             if classification == ItemClassification.filler:
                 emoji = "<:filler:1277502385459171338>"
             if classification == ItemClassification.useful:
                 emoji = "<:useful:1277502389729103913>"
-            if classification == ItemClassification.progression:
+            if classification == ItemClassification.progression or classification == ItemClassification.progression | ItemClassification.useful:
                 emoji = "<:progression:1277502382682542143>"
             if classification == ItemClassification.trap:
-                emoji = "❌"
+                emoji = ":x:"
+            if classification == ItemClassification.progression | ItemClassification.trap:
+                emoji = "<:prog_trap:1428702147435954237>"
 
             if inventory or item.quantity > 1:
                 return f"{emoji} {item.name} x{item.quantity}"
             return f"{emoji} {item.name}"
 
         if inventory:
-            new_items = list(NetworkItem(i, tracker.game, tracker.all_items[i]) for i in tracker.all_items)
+            new_items = tracker.all_items.copy()
+            merged = Counter()
+            for item in new_items:
+                merged[(item.name, item.classification)] += item.quantity
+            new_items = [NetworkItem(name=k[0], game=tracker.game, quantity=v, flags=k[1]) for (k, v) in merged.items()]
+
         else:
             new_items = tracker.notification_queue.copy()
 
@@ -1050,6 +1059,7 @@ class APTracker(Extension):
         trackers = json.dumps(converter.unstructure(self.old_trackers), indent=2)
         self.last_save = datetime.datetime.now(tz=datetime.UTC)
         task_logger.debug("Saving tracker data to disk")
+        shutil.copyfile("trackers.json", "trackers.json.bak")
         async with aiofiles.open("trackers.json", "w") as f:
             await f.write(trackers)
         cheese = json.dumps(converter.unstructure(self.cheese), indent=2)
@@ -1073,6 +1083,9 @@ class APTracker(Extension):
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
+            if os.path.exists("trackers.json.bak"):
+                with open("trackers.json.bak") as f:
+                    self.old_trackers = converter.structure(json.loads(f.read()), dict[int, list[TrackedGame]])
         try:
             if os.path.exists("cheese.json"):
                 with open("cheese.json") as f:

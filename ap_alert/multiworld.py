@@ -19,6 +19,7 @@ from archipelagopy import netutils
 from archipelagopy.utils import fetch_datapackage_from_webhost
 from shared.bs_helpers import process_table
 from world_data.models import Datapackage, ItemClassification
+from shared.web import make_session
 
 
 @attrs.define()
@@ -85,7 +86,7 @@ class Multiworld:
         from .converter import converter
 
         game = converter.unstructure(game)  # convert datetime to isoformat
-        async with aiohttp.ClientSession() as session:
+        async with make_session() as session:
             async with session.put(f"{self.url}/game/{game['id']}", json=game) as response:
                 if response.status != 200:
                     raise aiohttp.ClientResponseError(
@@ -155,7 +156,7 @@ class CheeseAgent(BaseAgent):
             if self.mw.url.startswith("https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/"):
                 self.mw.cheese_url = self.mw.url
             else:
-                async with aiohttp.ClientSession() as session:
+                async with make_session() as session:
                     async with session.post(
                         "https://cheesetrackers.theincrediblewheelofchee.se/api/tracker",
                         json={"url": self.mw.url},
@@ -167,7 +168,7 @@ class CheeseAgent(BaseAgent):
                 self.mw.cheese_url = f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}"
 
         logging.info(f"Refreshing {self.mw.cheese_url}")
-        async with aiohttp.ClientSession() as session:
+        async with make_session() as session:
             async with session.get(self.mw.cheese_url) as response:
                 txt = await response.text()
         data = json.loads(txt)
@@ -199,7 +200,7 @@ class WebTrackerAgent(BaseAgent):
         self.mw.ap_tracker_id = self.mw.url.split("/")[-1]
         logging.info(f"Refreshing cheeseless {self.mw.url}")
         multitracker_url = self.mw.url
-        async with aiohttp.ClientSession() as session:
+        async with make_session() as session:
             try:
                 async with session.get(multitracker_url) as response:
                     if response.status != 200:
@@ -243,7 +244,7 @@ class WebTrackerAgent(BaseAgent):
             await slot.refresh_metadata()
         logging.info(f"Refreshing {slot.url}")
         try:
-            async with aiohttp.ClientSession() as session:
+            async with make_session() as session:
                 async with session.get(slot.url) as response:
                     if response.status == 500 and "/tracker/" in slot.url:
                         slot.url = slot.url.replace("/tracker/", "/generic_tracker/")
@@ -297,9 +298,9 @@ class WebTrackerAgent(BaseAgent):
 
         new_items: list[NetworkItem] = []
         for r in rows:
-            slot.all_items[r[index_item]] = r[index_amount]
+            item = NetworkItem(r[index_item], slot.game, r[index_amount])
+            slot.all_items.append(item)
             if r[index_order] > slot.latest_item:
-                item = NetworkItem(r[index_item], slot.game, 1)
                 new_items.append(item)
                 if DATAPACKAGES.get(slot.game) is not None:
                     classification = DATAPACKAGES[slot.game].items.setdefault(r[index_item], ItemClassification.unknown)
@@ -338,7 +339,7 @@ class ApiTrackerAgent(BaseAgent):
             self.mw.ap_tracker_id = self.mw.url.split("/")[-1]
 
         logging.info(f"Refreshing API multiworld {self.mw.url}")
-        async with aiohttp.ClientSession() as session:
+        async with make_session() as session:
             if self.mw.static_tracker_data is None:
                 static_url = f"{self.mw.ap_scheme}://{self.mw.ap_hostname}/api/static_tracker/{self.mw.ap_tracker_id}"
                 async with session.get(static_url) as response:
@@ -367,18 +368,20 @@ class ApiTrackerAgent(BaseAgent):
         self.mw.player_items_received = data.get("player_items_received", [])
 
     async def refresh_game(self, slot: TrackedGame) -> bool:
-        if self.mw.player_items_received is None:
+        if self.mw.player_items_received is None or not slot.all_items:
             await self.refresh()
             if self.mw.player_items_received is None:
                 return False
         new_items: list[NetworkItem] = []
+        all_items: list[NetworkItem] = []
         api_items: list[netutils.NetworkItem] = next((i["items"] for i in self.mw.player_items_received if i["player"] == slot.slot_id), [])
 
-        if len(api_items) - 1 == slot.latest_item:
+        if len(api_items) - 1 == slot.latest_item and slot.all_items:
             return False
-        elif len(api_items) - 1 < slot.latest_item:
+        if len(api_items) < slot.latest_item:
             logging.error(f"Rollback detected in {slot.url}")
-            slot.latest_item = -1
+            slot.latest_item = len(api_items) - 1
+            return False
 
         checksum = self.mw.static_tracker_data["datapackage"].get(slot.game, {}).get("checksum")
         if checksum:
@@ -393,18 +396,22 @@ class ApiTrackerAgent(BaseAgent):
             ap_datapackage["item_id_to_name"] = {v: k for k, v in ap_datapackage.get("item_name_to_id", {}).items()}
 
         for index, netitem in enumerate(api_items, start=0):
-            if index > slot.latest_item:
-                item_id = netitem[0]
-                #  location = netitem[1]
-                #  sender = netitem[2]
-                flags = netitem[3] if len(netitem) > 3 else 0
+            item_id = netitem[0]
+            #  location = netitem[1]
+            #  sender = netitem[2]
+            flags = netitem[3] if len(netitem) > 3 else 0
 
-                item_name = ap_datapackage["item_id_to_name"].get(item_id, str(item_id))
-                item = NetworkItem(item_name, slot.game, 1, ItemClassification.from_network_flag(flags))
+            item_name = ap_datapackage["item_id_to_name"].get(item_id, str(item_id))
+            classification = ItemClassification.from_network_flag(flags)
+            classification = DATAPACKAGES[slot.game].postprocess_item_classification(item_name, classification)
+            item = NetworkItem(item_name, slot.game, 1, classification)
+            all_items.append(item)
+            if index > slot.latest_item:
                 new_items.append(item)
                 if item.classification in [ItemClassification.progression, ItemClassification.mcguffin]:
                     slot.last_progression = (item_name, datetime.datetime.now(tz=datetime.UTC))
 
+        slot.all_items = all_items
         if not new_items:
             return False
 
