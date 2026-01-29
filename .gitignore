@@ -16,3 +16,4 @@ config.json
 /world_data/
 
 /.env
+/trackers.json.bak

@@ -411,6 +411,7 @@ class ApiTrackerAgent(BaseAgent):
                 if item.classification in [ItemClassification.progression, ItemClassification.mcguffin]:
                     slot.last_progression = (item_name, datetime.datetime.now(tz=datetime.UTC))
 
+        slot.last_refresh = datetime.datetime.now(tz=datetime.timezone.utc)
         slot.all_items = all_items
         if not new_items:
             return False

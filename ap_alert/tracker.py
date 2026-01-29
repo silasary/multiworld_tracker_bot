@@ -85,17 +85,27 @@ class APTracker(Extension):
         self.tracker_db = MongoCache(TrackedGame, db["trackers"], key_field="_id", hard_limit=0)
         self.trackers_by_player: dict[int, list[str]] = TTLCache()
         self.load()
+        try:
+            from ap_alert.database import DATABASE
 
-    def get_player_settings(self, id: int) -> Player:
+            self.database = DATABASE
+        except Exception as e:
+            logging.error(f"Failed to initialize database: {e}")
+            self.database = None
+
+    async def get_player_settings(self, id: int) -> Player:
         """Get the player settings for a user.  If they don't exist, create them."""
-        player = self.player_db.get(id)
-        if player is not None:
-            return player
-        player = self.players.get(id)
+        if self.database:
+            player = await self.database.fetch_player(id)
+        else:
+            player = None
+        if player is None:
+            player = self.players.get(id)
         if player is None:
             player = Player(id)
             self.players[id] = player
-        self.player_db[id] = player
+            if self.database:
+                await self.database.save_player(player)
         return player
 
     def get_trackers(self, id: int) -> list[TrackedGame]:
@@ -266,17 +276,19 @@ class APTracker(Extension):
     @slash_option("api_key", "Your Cheese Tracker API key", OptionType.STRING, required=True)
     async def ap_authenticate(self, ctx: SlashContext, api_key: str) -> None:
         """Authenticate with Cheese Tracker. This allows the bot to automatically track your claimed games."""
-        player = self.get_player_settings(ctx.author_id)
+        player = await self.get_player_settings(ctx.author_id)
         player.cheese_api_key = api_key.strip()
         await ctx.send("API key saved", ephemeral=True)
+        if self.database:
+            await self.database.save_player(player)
         try:
             cheese_dash = await player.get_trackers()
         except BadAPIKeyException:
             await ctx.send("That's not a valid API Key...  Please copy it directly from https://cheesetrackers.theincrediblewheelofchee.se/settings", ephemeral=True)
             player.cheese_api_key = None
-            await self.save()
+            if self.database:
+                await self.database.save_player(player)
             return
-        await self.save()
 
         for multiworld in cheese_dash:
             await self.sync_cheese(ctx.author, multiworld)
@@ -660,8 +672,10 @@ class APTracker(Extension):
         await ctx.defer(ephemeral=True)
         m = regex_filter.match(ctx.custom_id)
         if m.group(1) == "default":
-            player_settings = self.get_player_settings(ctx.author_id)
+            player_settings = await self.get_player_settings(ctx.author_id)
             player_settings.default_filters = Filters(int(m.group(2)))
+            if self.database:
+                await self.database.save_player(player_settings)
             await ctx.send("Default filter updated", ephemeral=True)
             return
 
@@ -676,8 +690,10 @@ class APTracker(Extension):
         await ctx.defer(ephemeral=True)
         m = regex_hint_filter.match(ctx.custom_id)
         if m.group(1) == "default":
-            player_settings = self.get_player_settings(ctx.author_id)
+            player_settings = await self.get_player_settings(ctx.author_id)
             player_settings.default_hint_filters = HintFilters(int(m.group(2)))
+            if self.database:
+                await self.database.save_player(player_settings)
             await ctx.send("Default hint filter updated", ephemeral=True)
             return
 
@@ -690,7 +706,7 @@ class APTracker(Extension):
     @ap.subcommand("settings")
     async def ap_settings(self, ctx: SlashContext) -> None:
         """Configure your Archipelago settings."""
-        player_settings = self.get_player_settings(ctx.author_id)
+        player_settings = await self.get_player_settings(ctx.author_id)
 
         def filter_button(name: str, value: Filters):
             colour = ButtonStyle.GREY
@@ -844,10 +860,7 @@ class APTracker(Extension):
             raise ValueError("Tracker must have a URL")
         if tracker.user_id == -1:
             tracker.user_id = player_id
-        self.tracker_db[tracker._id] = tracker
-
-        if player_id in self.trackers_by_player:
-            self.trackers_by_player[player_id].append(tracker._id)
+        self.get_trackers(player_id).append(tracker)
 
     def get_all_players(self) -> list[int]:
         players = []
@@ -879,7 +892,7 @@ class APTracker(Extension):
                 if not player:
                     continue
 
-                player_settings = self.get_player_settings(player.id)
+                player_settings = await self.get_player_settings(player.id)
                 player_settings.update(player)
 
                 if player_settings.cheese_api_key:
@@ -895,6 +908,8 @@ class APTracker(Extension):
                 urls = set()
                 for tracker in trackers:
                     task_logger.debug(f"Processing tracker {tracker.url} for user {user}")
+                    if tracker.user_id == -1:
+                        tracker.user_id = user
                     try:
                         if tracker.failures >= 10:
                             self.remove_tracker(player, tracker)
@@ -952,6 +967,7 @@ class APTracker(Extension):
                             except Forbidden:
                                 logging.error(f"Failed to send message to {player.global_name} ({player.id})")
                                 tracker.failures += 1
+                                player_settings.quiet_mode = True
                                 continue
 
                             hints = []
@@ -970,8 +986,11 @@ class APTracker(Extension):
                             except Forbidden:
                                 logging.error(f"Failed to send message to {player.global_name} ({player.id})")
                                 tracker.failures += 1
+                                player_settings.quiet_mode = True
                                 continue
 
+                        if self.database:
+                            await self.database.save_tracker(tracker)
                         tracker_count += 1
                         progress += 1
                         games[tracker.game] = games.get(tracker.game, 0) + 1
@@ -1109,7 +1128,7 @@ class APTracker(Extension):
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
-        self.last_save = datetime.datetime.now(tz=datetime.UTC)
+        self.last_save = datetime.datetime.min.replace(tzinfo=datetime.UTC)
 
 
 def recolour_buttons(components: list[ActionRow]) -> list[Button]:
