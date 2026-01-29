@@ -84,6 +84,7 @@ class APTracker(Extension):
             self.database = DATABASE
         except Exception as e:
             logging.error(f"Failed to initialize database: {e}")
+            sentry_sdk.capture_exception(e)
             self.database = None
 
     async def get_player_settings(self, id: int) -> Player:

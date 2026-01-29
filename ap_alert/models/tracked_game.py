@@ -120,6 +120,9 @@ class TrackedGame:
             hint.id = str(hint.id)
             if hint.id not in self.finder_hints:
                 self.finder_hints[hint.id] = hint
+                if hint.finder_game_id == hint.receiver_game_id:
+                    # Self hint, never notify
+                    continue
                 if not hint.found:
                     hint.update = HintUpdate.new
                     if filters & HintFilters.finder:
