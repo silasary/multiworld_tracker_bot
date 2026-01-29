@@ -96,6 +96,8 @@ class APTracker(Extension):
         if player is None:
             player = Player(id)
             self.players[id] = player
+            if self.database:
+                await self.database.save_player(player)
         return player
 
     def get_trackers(self, id: int) -> list[TrackedGame]:
@@ -172,7 +174,7 @@ class APTracker(Extension):
                     break
             else:
                 tracker = TrackedGame(url)
-                self.get_trackers(ctx.author_id).append(tracker)
+                self.add_tracker(ctx.author_id, tracker)
                 await self.save()
 
             room, multiworld = await self.url_to_multiworld("/".join(url.split("/")[:-2]))
@@ -750,7 +752,7 @@ class APTracker(Extension):
                         continue
 
                     tracker = TrackedGame(game["url"])
-                    self.get_trackers(player.id).append(tracker)
+                    self.add_tracker(player.id, tracker)
                     tracker.game = game["game"]
                     await self.check_for_dp(tracker)
 
@@ -821,6 +823,16 @@ class APTracker(Extension):
                 self.get_trackers(player.id).remove(t)
                 return
 
+    def add_tracker(self, player_id: int, tracker: TrackedGame) -> None:
+        if not tracker.url:
+            raise ValueError("Tracker must have a URL")
+        if tracker.user_id == -1:
+            tracker.user_id = player_id
+        self.get_trackers(player_id).append(tracker)
+
+    def get_all_players(self) -> list[int]:
+        return list(self.trackers.keys())
+
     @Task.create(IntervalTrigger(hours=3))
     async def refresh_all(self) -> BaseTrigger | None:
         task_id = self.refresh_all.iteration
@@ -835,9 +847,10 @@ class APTracker(Extension):
         progress = 0
         games: dict[str, int] = {}
 
-        queue = list(self.trackers.items())
+        queue = self.get_all_players()
         # random.shuffle(queue)
-        for user, trackers in queue:
+        for user in queue:
+            trackers = self.get_trackers(user)
             task_logger.debug(f"Processing user {user}")
             try:
                 player = await self.bot.fetch_user(user)
@@ -861,6 +874,8 @@ class APTracker(Extension):
                 ids = set()
                 for tracker in trackers:
                     task_logger.debug(f"Processing tracker {tracker.url} for user {user}")
+                    if tracker.user_id == -1:
+                        tracker.user_id = user
                     try:
                         if tracker.failures >= 10:
                             self.remove_tracker(player, tracker)
@@ -922,6 +937,7 @@ class APTracker(Extension):
                             except Forbidden:
                                 logging.error(f"Failed to send message to {player.global_name} ({player.id})")
                                 tracker.failures += 1
+                                player_settings.quiet_mode = True
                                 continue
 
                             hints = []
@@ -940,8 +956,11 @@ class APTracker(Extension):
                             except Forbidden:
                                 logging.error(f"Failed to send message to {player.global_name} ({player.id})")
                                 tracker.failures += 1
+                                player_settings.quiet_mode = True
                                 continue
 
+                        if self.database:
+                            await self.database.save_tracker(tracker)
                         tracker_count += 1
                         progress += 1
                         games[tracker.game] = games.get(tracker.game, 0) + 1
@@ -1087,7 +1106,7 @@ class APTracker(Extension):
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
-        self.last_save = datetime.datetime.now(tz=datetime.UTC)
+        self.last_save = datetime.datetime.min.replace(tzinfo=datetime.UTC)
 
 
 def recolour_buttons(components: list[ActionRow]) -> list[Button]:

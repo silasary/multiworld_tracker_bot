@@ -7,7 +7,7 @@ import attrs
 
 @attrs.define()
 class Hint:
-    id: int
+    id: str
     item: str
     location: str
     entrance: str

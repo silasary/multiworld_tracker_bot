@@ -41,6 +41,20 @@ class Database:
         self.tracker_cache[object_id] = tracker
         return tracker
 
+    async def save_tracker(self, tracker: TrackedGame) -> None:
+        data = to_dict(tracker)
+        del data["_id"]
+        if tracker._id is None or tracker._id == "None":
+            result = await tracker_collection.insert_one(data)
+            tracker._id = str(result.inserted_id)
+            self.tracker_cache[tracker._id] = tracker
+        else:
+            await tracker_collection.update_one(
+                {"_id": ObjectId(tracker._id)},
+                {"$set": data},
+                upsert=True,
+            )
+
     async def set_cheese_id(self, tracker: TrackedGame, cheese_id: int):
         tracker.cheese_id = cheese_id
         await tracker_collection.update_one(
@@ -64,6 +78,14 @@ class Database:
             {"$set": to_dict(player)},
             upsert=True,
         )
+
+    async def fetch_all_players(self) -> list[Player]:
+        players = []
+        async for document in player_collection.find({}):
+            player = from_dict(document, Player)
+            self.player_cache[player.id] = player
+            players.append(player)
+        return players
 
 
 DATABASE = Database()

@@ -22,6 +22,7 @@ import logging
 class TrackedGame:
     url: str  # https://archipelago.gg/tracker/tracker_id/0/slot_id
     _id: str | None = None
+    user_id: int = -1
     cheese_id: int = -1
     latest_item: int = -1
     disabled: bool = False
@@ -46,8 +47,8 @@ class TrackedGame:
     checks: dict[str, bool] = attrs.field(factory=dict, repr=False)
 
     # hints: list[Hint] = attrs.field(factory=list)
-    finder_hints: dict[int, Hint] = attrs.field(factory=dict, repr=False)
-    receiver_hints: dict[int, Hint] = attrs.field(factory=dict, repr=False)
+    finder_hints: dict[str, Hint] = attrs.field(factory=dict, repr=False)
+    receiver_hints: dict[str, Hint] = attrs.field(factory=dict, repr=False)
 
     notification_queue: list[NetworkItem] = attrs.field(factory=list, repr=False)
 
@@ -116,6 +117,7 @@ class TrackedGame:
         finder_hints = [Hint(**h, is_finder=True) for h in data if h.get("finder_game_id") == self.cheese_id]
         receiver_hints = [Hint(**h, is_finder=False) for h in data if h.get("receiver_game_id") == self.cheese_id and h.get("finder_game_id") != self.cheese_id]
         for hint in finder_hints:
+            hint.id = str(hint.id)
             if hint.id not in self.finder_hints:
                 self.finder_hints[hint.id] = hint
                 if not hint.found:
@@ -138,6 +140,7 @@ class TrackedGame:
                 return updated
 
         for hint in receiver_hints:
+            hint.id = str(hint.id)
             if hint.id not in self.receiver_hints:
                 self.receiver_hints[hint.id] = hint
                 if not hint.found:
