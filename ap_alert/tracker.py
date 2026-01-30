@@ -1052,7 +1052,8 @@ class APTracker(Extension):
         self.last_save = datetime.datetime.now(tz=datetime.UTC)
         task_logger.debug("Saving tracker data to disk")
         trackers = json.dumps(converter.unstructure(self.trackers), indent=2)
-        shutil.copyfile("trackers.json", "trackers.json.bak")
+        if os.path.exists("trackers.json"):
+            shutil.copyfile("trackers.json", "trackers.json.bak")
         async with aiofiles.open("trackers.json", "w") as f:
             await f.write(trackers)
         cheese = json.dumps(converter.unstructure(self.cheese), indent=2)
