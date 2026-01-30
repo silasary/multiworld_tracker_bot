@@ -9,7 +9,7 @@ DEFAULTS = {
     "token": "",
     "owners": [154363842451734528, 222352614832996354],
     "sentry_dsn": "https://7aadf0c15f880e90e01c4dba496f152d@o233010.ingest.us.sentry.io/4507219660832768",
-    }
+}
 
 
 def get(key: str) -> Any:
@@ -17,10 +17,12 @@ def get(key: str) -> Any:
         cfg = json.load(open("config.json"))
     except FileNotFoundError:
         cfg = {}
-    if key in cfg:
-        return cfg[key]
-    elif key in os.environ:
+    if key in os.environ:
+        if cfg[key] == os.environ[key]:
+            return cfg[key]
         cfg[key] = os.environ[key]
+    elif key in cfg:
+        return cfg[key]
     elif key in DEFAULTS:
         # Lock in the default value if we use it.
         cfg[key] = DEFAULTS[key]
