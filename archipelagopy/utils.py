@@ -1,6 +1,6 @@
 import json
 import logging
-from functools import lru_cache
+from functools import lru_cache, cache
 import os
 import typing
 
@@ -68,3 +68,29 @@ async def fetch_datapackage_from_webhost(game: str, checksum: str) -> dict[str, 
             data = await response.json()
             store_data_package_for_checksum(game, data)
             return data
+
+
+@cache
+def get_unique_identifier():
+    common_path = cache_path("common.json")
+    if os.path.exists(common_path):
+        with open(common_path) as f:
+            common_file = json.load(f)
+            uuid = common_file.get("uuid", None)
+    else:
+        common_file = {}
+        uuid = None
+
+    if uuid:
+        return uuid
+
+    from uuid import uuid4
+
+    uuid = str(uuid4())
+    common_file["uuid"] = uuid
+    if not os.path.exists(os.path.dirname(common_path)):
+        os.makedirs(os.path.dirname(common_path), exist_ok=True)
+
+    with open(common_path, "w") as f:
+        json.dump(common_file, f, separators=(",", ":"))
+    return uuid
