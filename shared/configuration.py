@@ -18,7 +18,7 @@ def get(key: str) -> Any:
     except FileNotFoundError:
         cfg = {}
     if key in os.environ:
-        if cfg[key] == os.environ[key]:
+        if cfg.get(key, "") == os.environ[key]:
             return cfg[key]
         cfg[key] = os.environ[key]
     elif key in cfg:
