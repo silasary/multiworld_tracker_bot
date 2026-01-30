@@ -11,9 +11,15 @@ import sys
 
 from interactions.models.internal.tasks import IntervalTrigger, Task
 
+from shared import configuration
+
 from .multiworld import Datapackage, ItemClassification, DATAPACKAGES
 
+configuration.DEFAULTS["world_data_repo_url"] = "git@github.com:silasary/world_data.git"
+
 classifications = {v.name: v for v in ItemClassification}
+
+repo_url = configuration.get("world_data_repo_url")
 
 
 async def git(args: list[str], cwd: str) -> int:
@@ -53,7 +59,6 @@ async def update_datapackage() -> None:
 
 
 async def clone_repo() -> None:
-    repo_url = "git@github.com:silasary/world_data.git"
     if os.path.exists("world_data"):
         await git(["clean", "-fdx"], cwd="world_data")
         await git(["pull", "--commit", "origin", "main"], cwd="world_data")
@@ -114,4 +119,4 @@ async def push() -> None:
         if lines_updated > 0:
             message += f" {lines_updated} items updated"
         await git(["commit", "-m", message], cwd="world_data")
-        await git(["push", "git@github.com:silasary/world_data.git"], cwd="world_data")
+        await git(["push", repo_url], cwd="world_data")
