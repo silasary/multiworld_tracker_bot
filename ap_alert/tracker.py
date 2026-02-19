@@ -765,7 +765,7 @@ class APTracker(Extension):
                     tracker.name = f"{room} - **{game['name']}**"
                 tracker.update(game)
 
-                if game["checks_done"] == game["checks_total"] and game.completion_status in [CompletionStatus.done, CompletionStatus.released]:
+                if (game["checks_done"] == game["checks_total"] and game.completion_status == CompletionStatus.done) or game.completion_status == CompletionStatus.released:
                     # Removing needs an and, because 100% no goal can happen.
                     self.remove_tracker(player, tracker.url)
                     await player.send(f"Game {tracker.name} is complete")
