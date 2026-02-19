@@ -870,6 +870,9 @@ class APTracker(Extension):
                     except BadAPIKeyException:
                         player_settings.cheese_api_key = None
                         await player.send("Failed to authenticate with Cheese Tracker.  Please reauthenticate with `/ap authenticate`")
+                        if self.database:
+                            await self.database.save_player(player_settings)
+
                 cheese_dash = []
 
                 urls = set()
