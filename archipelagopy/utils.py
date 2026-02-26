@@ -54,13 +54,13 @@ def store_data_package_for_checksum(game: str, data: typing.Dict[str, typing.Any
             logging.debug(f"Could not store data package: {e}")
 
 
-async def fetch_datapackage_from_webhost(game: str, checksum: str) -> dict[str, typing.Any]:
+async def fetch_datapackage_from_webhost(game: str, checksum: str, webhost: str = "https://archipelago.gg") -> dict[str, typing.Any]:
     """Fetch a datapackage from the Archipelago webhost."""
     data = load_data_package_for_checksum(game, checksum)
     if data:
         return data
 
-    url = f"https://archipelago.gg/api/datapackage/{checksum}"
+    url = f"{webhost}/api/datapackage/{checksum}"
     async with make_session() as session:
         async with session.get(url) as response:
             if response.status != 200:

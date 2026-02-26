@@ -385,7 +385,11 @@ class ApiTrackerAgent(BaseAgent):
 
         checksum = self.mw.static_tracker_data["datapackage"].get(slot.game, {}).get("checksum")
         if checksum:
-            ap_datapackage = await fetch_datapackage_from_webhost(slot.game, checksum)
+            try:
+                ap_datapackage = await fetch_datapackage_from_webhost(slot.game, checksum, f"{self.mw.ap_scheme}://{self.mw.ap_hostname}")
+            except ValueError as e:
+                ap_datapackage = None
+                print(e)
         else:
             ap_datapackage = None
         if not ap_datapackage:
