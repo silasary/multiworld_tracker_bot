@@ -1022,7 +1022,7 @@ class APTracker(Extension):
                     self.stats["running_refresh"] = {
                         "task_id": task_id,
                         "current_user": user_count,
-                        "total_users": len(self.trackers),
+                        "total_users": len(queue),
                         "current_tracker_count": tracker_count,
                     }
                     await self.save()
