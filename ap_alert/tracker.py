@@ -972,7 +972,7 @@ class APTracker(Extension):
                                     await self.send_new_items(player, tracker)
                                     asyncio.create_task(self.try_classify(player, tracker, items))
                             except Forbidden:
-                                logging.error(f"Failed to send message to {player.global_name} ({player.id})")
+                                task_logger.error(f"Failed to send message to {player.global_name} ({player.id}) - DMs are closed")
                                 tracker.failures += 1
                                 await self.set_quiet_mode(user, True)
                                 continue
@@ -983,7 +983,7 @@ class APTracker(Extension):
                                     hints = tracker.refresh_hints(multiworld)
                             except Exception as e:
                                 sentry_sdk.capture_exception(e)
-                                logging.error(f"Failed to get hints for {tracker.name}")
+                                task_logger.error(f"Failed to get hints for {tracker.name}", exc_info=e)
                             try:
                                 if hints:
                                     components = []
@@ -991,7 +991,7 @@ class APTracker(Extension):
                                         components.append(Button(style=ButtonStyle.GREY, label="Configure Hint Filters", emoji="⚙️", custom_id=f"settings:{tracker.cheese_id}"))
                                     await player.send(f"New hints for {tracker.name}:", embeds=[h.embed() for h in hints], components=components)
                             except Forbidden:
-                                logging.error(f"Failed to send message to {player.global_name} ({player.id})")
+                                task_logger.error(f"Failed to send message to {player.global_name} ({player.id}) - DMs are closed")
                                 tracker.failures += 1
                                 await self.set_quiet_mode(user, True)
                                 continue
@@ -1013,7 +1013,7 @@ class APTracker(Extension):
                         else:
                             await asyncio.sleep(0)
                     except Exception as e:
-                        logging.error(f"Error occurred while processing tracker {tracker.cheese_id} for user {user}: {e}")
+                        task_logger.error(f"Error occurred while processing tracker {tracker.cheese_id} for user {user}: {e}")
                         sentry_sdk.capture_exception(e)
 
                 if trackers:
