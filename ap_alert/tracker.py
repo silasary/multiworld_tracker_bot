@@ -821,12 +821,9 @@ class APTracker(Extension):
             tracker.disabled = True
 
         for t in self.get_trackers(player.id).copy():
-            if isinstance(tracker, str) and t.url == tracker:
+            if (isinstance(tracker, str) and t.url == tracker) or (isinstance(tracker, TrackedGame) and t == tracker):
                 self.get_trackers(player.id).remove(t)
-                return
-            elif isinstance(tracker, TrackedGame) and t == tracker:
-                self.get_trackers(player.id).remove(t)
-                return
+            return
 
     def add_tracker(self, player_id: int, tracker: TrackedGame) -> None:
         if not tracker.url:
@@ -1084,19 +1081,23 @@ class APTracker(Extension):
         if datetime.datetime.now(tz=datetime.UTC) - self.last_save < datetime.timedelta(seconds=60):
             return
         self.last_save = datetime.datetime.now(tz=datetime.UTC)
-        task_logger.debug("Saving tracker data to disk")
-        trackers = json.dumps(converter.unstructure(self.trackers), indent=2)
-        if os.path.exists("trackers.json"):
-            shutil.copyfile("trackers.json", "trackers.json.bak")
-        async with aiofiles.open("trackers.tmp", "w") as f:
-            await f.write(trackers)
-        os.replace("trackers.tmp", "trackers.json")
-        cheese = json.dumps(converter.unstructure(self.cheese), indent=2)
-        async with aiofiles.open("cheese.json", "w") as f:
-            await f.write(cheese)
-        players = json.dumps(converter.unstructure(self.players), indent=2)
-        async with aiofiles.open("players.json", "w") as f:
-            await f.write(players)
+        if self.trackers:
+            task_logger.debug("Saving tracker data to disk")
+            trackers = json.dumps(converter.unstructure(self.trackers), indent=2)
+            if os.path.exists("trackers.json"):
+                shutil.copyfile("trackers.json", "trackers.json.bak")
+            async with aiofiles.open("trackers.tmp", "w") as f:
+                await f.write(trackers)
+            os.replace("trackers.tmp", "trackers.json")
+        if self.cheese:
+            cheese = json.dumps(converter.unstructure(self.cheese), indent=2)
+            async with aiofiles.open("cheese.json", "w") as f:
+                await f.write(cheese)
+        if self.players:
+            players = json.dumps(converter.unstructure(self.players), indent=2)
+            async with aiofiles.open("players.json", "w") as f:
+                await f.write(players)
+
         stats = json.dumps(self.stats, indent=2)
         async with aiofiles.open("stats.json", "w") as f:
             await f.write(stats)
