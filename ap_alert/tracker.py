@@ -102,8 +102,16 @@ class APTracker(Extension):
                 await self.database.save_player(player)
         return player
 
-    def get_trackers(self, id: int) -> list[TrackedGame]:
-        return self.trackers.setdefault(id, [])
+    async def get_trackers(self, discord_id: int) -> list[TrackedGame]:
+        all_trackers = []
+
+        if self.database:
+            try:
+                all_trackers.extend(await self.database.fetch_trackers_for_user(discord_id))
+            except Exception as e:
+                task_logger.error(f"Failed to fetch trackers for user {discord_id}: {e}")
+        all_trackers.extend(self.trackers.get(discord_id, []))
+        return all_trackers
 
     @property
     def user_count(self):
@@ -169,7 +177,7 @@ class APTracker(Extension):
 
         if url.split("/")[-1].isnumeric():
             # Track slot
-            for t in self.get_trackers(ctx.author_id):
+            for t in await self.get_trackers(ctx.author_id):
                 if t.url == url:
                     tracker = t
                     tracker.disabled = False
@@ -212,14 +220,14 @@ class APTracker(Extension):
 
     @ap.subcommand("refresh")
     async def ap_refresh(self, ctx: SlashContext) -> None:
-        if not self.get_trackers(ctx.author_id):
+        if not await self.get_trackers(ctx.author_id):
             await ctx.send(f"Track a game with {self.ap_track.mention()} first", ephemeral=True)
             return
 
         ephemeral = await defer_ephemeral_if_guild(ctx)
 
         games = {}
-        for tracker in self.get_trackers(ctx.author_id).copy():
+        for tracker in await self.get_trackers(ctx.author_id):
             _room, multiworld = await self.url_to_multiworld(tracker.multitracker_url)
             new_items = await multiworld.refresh_game(tracker)
             if new_items:
@@ -417,13 +425,9 @@ class APTracker(Extension):
     @ap.subcommand("dashboard")
     async def ap_dashboard(self, ctx: SlashContext) -> None:
         await ctx.defer(ephemeral=True)
-        if not self.get_trackers(ctx.author_id):
-            await ctx.send(f"Track a game with {self.ap_track.mention()} first", ephemeral=True)
-            return
-
-        trackers = self.get_trackers(ctx.author_id)
+        trackers = await self.get_trackers(ctx.author_id)
         if not trackers:
-            await ctx.send("No games tracked", ephemeral=True)
+            await ctx.send(f"Track a game with {self.ap_track.mention()} first", ephemeral=True)
             return
 
         buttons: list[Button] = []
@@ -453,7 +457,7 @@ class APTracker(Extension):
     async def dashboard_embed(self, ctx: ComponentContext) -> Embed:
         await ctx.defer(ephemeral=True)
         m = regex_dash.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
+        tracker = next((t for t in await self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return Embed(title="Game not found")
 
@@ -524,17 +528,17 @@ class APTracker(Extension):
     async def remove(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_remove.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
+        tracker = next((t for t in await self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
-        self.get_trackers(ctx.author_id).remove(tracker)
+        self.remove_tracker(ctx.author_id, tracker)
         await ctx.send("Tracker removed", ephemeral=True)
 
     @component_callback(regex_disable)
     async def disable(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_disable.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
+        tracker = next((t for t in await self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         tracker.disabled = True
@@ -544,7 +548,7 @@ class APTracker(Extension):
     async def unblock(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_unblock.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
+        tracker = next((t for t in await self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         multiworld = self.cheese[tracker.tracker_id]
@@ -561,7 +565,7 @@ class APTracker(Extension):
     async def still_bk(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_bk.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
+        tracker = next((t for t in await self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         multiworld = self.cheese[tracker.tracker_id]
@@ -577,7 +581,7 @@ class APTracker(Extension):
     async def inventory(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True)
         m = regex_inv.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
+        tracker = next((t for t in await self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         if not tracker.all_items:
@@ -589,7 +593,7 @@ class APTracker(Extension):
     async def settings(self, ctx: ComponentContext) -> None:
         await ctx.defer(ephemeral=True, edit_origin=False)
         m = regex_settings.match(ctx.custom_id)
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
+        tracker = next((t for t in await self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         multiworld = self.cheese[tracker.tracker_id]
@@ -651,7 +655,7 @@ class APTracker(Extension):
             await ctx.send("Default filter updated", ephemeral=True)
             return
 
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
+        tracker = next((t for t in await self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         tracker.filters = Filters(int(m.group(2)))
@@ -669,7 +673,7 @@ class APTracker(Extension):
             await ctx.send("Default hint filter updated", ephemeral=True)
             return
 
-        tracker = next((t for t in self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
+        tracker = next((t for t in await self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
         tracker.hint_filters = HintFilters(int(m.group(2)))
@@ -736,27 +740,23 @@ class APTracker(Extension):
         for game in multiworld.games.values():
             game["url"] = f'{multiworld.ap_scheme}://{multiworld.ap_hostname}/tracker/{room}/0/{game["position"]}'
 
-            for t in self.get_trackers(player.id):
-                if t.url == game["url"]:
-                    tracker = t
-                    break
-                elif t.url == game["url"].replace("/tracker/", "/generic_tracker/"):
+            for t in await self.get_trackers(player.id):
+                if t.url == game["url"] or t.url == game["url"].replace("/tracker/", "/generic_tracker/"):
                     tracker = t
                     break
             else:
                 tracker = None
 
-            if game.get("effective_discord_username") == player.username:
-                if tracker is None:
-                    is_game_done = game["checks_done"] == game["checks_total"] or game.completion_status in [CompletionStatus.done, CompletionStatus.released]
-                    # If either condition is true, we don't want to autotrack track this game.
-                    if is_game_done or age > datetime.timedelta(days=1) or is_mw_abandoned or multiworld.goaled:
-                        continue
+            if game.get("effective_discord_username") == player.username and tracker is None:
+                is_game_done = game["checks_done"] == game["checks_total"] or game.completion_status in [CompletionStatus.done, CompletionStatus.released]
+                # If either condition is true, we don't want to autotrack track this game.
+                if is_game_done or age > datetime.timedelta(days=1) or is_mw_abandoned or multiworld.goaled:
+                    continue
 
-                    tracker = TrackedGame(game["url"])
-                    self.add_tracker(player.id, tracker)
-                    tracker.game = game["game"]
-                    await self.check_for_dp(tracker)
+                tracker = TrackedGame(game["url"])
+                self.add_tracker(player.id, tracker)
+                tracker.game = game["game"]
+                await self.check_for_dp(tracker)
 
             if tracker:
                 if multiworld.title:
@@ -820,9 +820,9 @@ class APTracker(Extension):
         if isinstance(tracker, TrackedGame):
             tracker.disabled = True
 
-        for t in self.get_trackers(player.id).copy():
+        for t in self.trackers[player.id].copy():
             if (isinstance(tracker, str) and t.url == tracker) or (isinstance(tracker, TrackedGame) and t == tracker):
-                self.get_trackers(player.id).remove(t)
+                self.trackers[player.id].remove(t)
             return
 
     def add_tracker(self, player_id: int, tracker: TrackedGame) -> None:
@@ -830,7 +830,7 @@ class APTracker(Extension):
             raise ValueError("Tracker must have a URL")
         if tracker.user_id == -1:
             tracker.user_id = player_id
-        self.get_trackers(player_id).append(tracker)
+        self.trackers.setdefault(player_id, []).append(tracker)
 
     def get_all_players(self) -> list[int]:
         return list(self.trackers.keys())
@@ -867,14 +867,8 @@ class APTracker(Extension):
         random.shuffle(queue)
         for user in queue:
             task_logger.debug(f"Processing user {user}")
-            if self.database:
-                try:
-                    trackers = await self.database.fetch_trackers_for_user(user.id)
-                except Exception as e:
-                    task_logger.error(f"Failed to fetch trackers for user {user.id}: {e}")
-                    continue
-            else:
-                trackers = self.get_trackers(user.id)
+            trackers = await self.get_trackers(user.id)
+
             try:
                 player = await self.bot.fetch_user(user.id)
                 if not player:
@@ -1129,9 +1123,6 @@ class APTracker(Extension):
             if os.path.exists("players.json"):
                 with open("players.json") as f:
                     self.players = converter.structure(json.loads(f.read()), dict[int, Player])
-                for player in self.players.values():
-                    if player.cheese_api_key:
-                        self.get_trackers(player.id)
         except Exception as e:
             sentry_sdk.capture_exception(e)
             print(e)
