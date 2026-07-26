@@ -764,6 +764,9 @@ class APTracker(Extension):
                 else:
                     tracker.name = f"{room} - **{game['name']}**"
                 tracker.update(game)
+                if tracker.disabled:
+                    found_tracker = True
+                    continue
 
                 if (game["checks_done"] == game["checks_total"] and game.completion_status == CompletionStatus.done) or game.completion_status == CompletionStatus.released:
                     # Removing needs an and, because 100% no goal can happen.
