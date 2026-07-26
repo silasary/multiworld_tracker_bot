@@ -1057,8 +1057,9 @@ class APTracker(Extension):
         trackers = json.dumps(converter.unstructure(self.trackers), indent=2)
         if os.path.exists("trackers.json"):
             shutil.copyfile("trackers.json", "trackers.json.bak")
-        async with aiofiles.open("trackers.json", "w") as f:
+        async with aiofiles.open("trackers.tmp", "w") as f:
             await f.write(trackers)
+        os.replace("trackers.tmp", "trackers.json")
         cheese = json.dumps(converter.unstructure(self.cheese), indent=2)
         async with aiofiles.open("cheese.json", "w") as f:
             await f.write(cheese)

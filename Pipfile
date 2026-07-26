@@ -16,7 +16,7 @@ redis = ">=5.2.1"
 requests = ">=2.32.3"
 sentry-sdk = ">=2.22.0"
 platformdirs = "*"
-"interactions.py" = {git = "https://github.com/interactions-py/interactions.py.git@garbage-protection"}
+"interactions.py" = ">=6.0.0rc1"
 aiofiles = "*"
 
 [dev-packages]
