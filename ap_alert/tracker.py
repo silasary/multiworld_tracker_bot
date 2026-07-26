@@ -817,6 +817,9 @@ class APTracker(Extension):
         return room, multiworld
 
     def remove_tracker(self, player, tracker: str | TrackedGame) -> None:
+        if isinstance(tracker, TrackedGame):
+            tracker.disabled = True
+
         for t in self.get_trackers(player.id).copy():
             if isinstance(tracker, str) and t.url == tracker:
                 self.get_trackers(player.id).remove(t)
@@ -849,13 +852,29 @@ class APTracker(Extension):
         progress = 0
         games: dict[str, int] = {}
 
-        queue = self.get_all_players()
+        queue: list[Player] = []
+        if self.database:
+            try:
+                queue = await self.database.fetch_all_players()
+            except Exception as e:
+                task_logger.error(f"Failed to fetch all players: {e}")
+
+        if not queue:
+            queue = [await self.get_player_settings(p) for p in self.get_all_players()]
+
         random.shuffle(queue)
         for user in queue:
             task_logger.debug(f"Processing user {user}")
-            trackers = self.get_trackers(user)
+            if self.database:
+                try:
+                    trackers = await self.database.fetch_trackers_for_user(user.id)
+                except Exception as e:
+                    task_logger.error(f"Failed to fetch trackers for user {user.id}: {e}")
+                    continue
+            else:
+                trackers = self.get_trackers(user.id)
             try:
-                player = await self.bot.fetch_user(user)
+                player = await self.bot.fetch_user(user.id)
                 if not player:
                     continue
 
@@ -878,20 +897,28 @@ class APTracker(Extension):
                 urls = set()
                 ids = set()
                 for tracker in trackers:
+                    if tracker.disabled:
+                        continue
                     task_logger.debug(f"Processing tracker {tracker.url} for user {user}")
                     if tracker.user_id == -1:
-                        tracker.user_id = user
+                        tracker.user_id = user.id
                     try:
                         if tracker.failures >= 10:
                             self.remove_tracker(player, tracker)
                             await player.send(f"Tracker {tracker.url} has been removed due to errors")
+                            if self.database:
+                                await self.database.save_tracker(tracker)
                             continue
 
                         if tracker.url in urls:
                             self.remove_tracker(player, tracker)
+                            if self.database:
+                                await self.database.save_tracker(tracker)
                             continue
                         if tracker.cheese_id in ids:
                             self.remove_tracker(player, tracker)
+                            if self.database:
+                                await self.database.save_tracker(tracker)
                             await self.save()
                             continue
                         urls.add(tracker.url)
@@ -907,6 +934,8 @@ class APTracker(Extension):
                             if tracker.failures >= 3:
                                 self.remove_tracker(player, tracker.url)
                                 await player.send(f"Tracker {tracker.url} has been removed due to errors")
+                            if self.database:
+                                await self.database.save_tracker(tracker)
                             continue
 
                         if tracker.filters == Filters.unset and player_settings.default_filters != Filters.unset:
@@ -934,6 +963,8 @@ class APTracker(Extension):
                                 if not new_items and tracker.failures > 10:
                                     self.remove_tracker(player, tracker.url)
                                     await player.send(f"Tracker {tracker.url} has been removed due to errors")
+                                    if self.database:
+                                        await self.database.save_tracker(tracker)
                                     continue
                                 if new_items:
                                     items = tracker.notification_queue.copy()

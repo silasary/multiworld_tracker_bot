@@ -35,6 +35,12 @@ class Database:
 
         return self.place_tracker(document)
 
+    async def fetch_trackers_for_user(self, user_id: int) -> list[TrackedGame]:
+        trackers = []
+        async for document in tracker_collection.find({"user_id": user_id}):
+            trackers.append(self.place_tracker(document))
+        return trackers
+
     def place_tracker(self, document: dict) -> TrackedGame:
         object_id = str(document["_id"])
         tracker = from_dict(document, TrackedGame)
