@@ -835,6 +835,11 @@ class APTracker(Extension):
     def get_all_players(self) -> list[int]:
         return list(self.trackers.keys())
 
+    async def set_quiet_mode(self, player: Player, quiet: bool) -> None:
+        player.quiet_mode = quiet
+        if self.database:
+            await self.database.save_player(player)
+
     @Task.create(IntervalTrigger(hours=3))
     async def refresh_all(self) -> BaseTrigger | None:
         task_id = self.refresh_all.iteration
@@ -875,19 +880,18 @@ class APTracker(Extension):
                 if not player:
                     continue
 
-                player_settings = await self.get_player_settings(player.id)
-                player_settings.update(player)
+                user.update(player)
 
-                if player_settings.cheese_api_key:
+                if user.cheese_api_key:
                     try:
-                        cheese_dash = await player_settings.get_trackers()
+                        cheese_dash = await user.get_trackers()
                         for multiworld in cheese_dash:
                             await self.sync_cheese(player, multiworld)
                     except BadAPIKeyException:
-                        player_settings.cheese_api_key = None
+                        user.cheese_api_key = None
                         await player.send("Failed to authenticate with Cheese Tracker.  Please reauthenticate with `/ap authenticate`")
                         if self.database:
-                            await self.database.save_player(player_settings)
+                            await self.database.save_player(user)
 
                 cheese_dash = []
 
@@ -935,10 +939,10 @@ class APTracker(Extension):
                                 await self.database.save_tracker(tracker)
                             continue
 
-                        if tracker.filters == Filters.unset and player_settings.default_filters != Filters.unset:
-                            tracker.filters = player_settings.default_filters
-                        if tracker.hint_filters == HintFilters.unset and player_settings.default_hint_filters != HintFilters.unset:
-                            tracker.hint_filters = player_settings.default_hint_filters
+                        if tracker.filters == Filters.unset and user.default_filters != Filters.unset:
+                            tracker.filters = user.default_filters
+                        if tracker.hint_filters == HintFilters.unset and user.default_hint_filters != HintFilters.unset:
+                            tracker.hint_filters = user.default_hint_filters
 
                         should_check = (
                             tracker.last_refresh is None
@@ -955,7 +959,7 @@ class APTracker(Extension):
                             new_items = False
 
                         ### DEBUG
-                        if not player_settings.quiet_mode:
+                        if not user.quiet_mode:
                             try:
                                 if not new_items and tracker.failures > 10:
                                     self.remove_tracker(player, tracker.url)
@@ -970,7 +974,7 @@ class APTracker(Extension):
                             except Forbidden:
                                 logging.error(f"Failed to send message to {player.global_name} ({player.id})")
                                 tracker.failures += 1
-                                player_settings.quiet_mode = True
+                                await self.set_quiet_mode(user, True)
                                 continue
 
                             hints = []
@@ -989,7 +993,7 @@ class APTracker(Extension):
                             except Forbidden:
                                 logging.error(f"Failed to send message to {player.global_name} ({player.id})")
                                 tracker.failures += 1
-                                player_settings.quiet_mode = True
+                                await self.set_quiet_mode(user, True)
                                 continue
 
                         if self.database:
