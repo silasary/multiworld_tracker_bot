@@ -823,6 +823,9 @@ class APTracker(Extension):
         if isinstance(tracker, TrackedGame):
             tracker.disabled = True
 
+        if player.id not in self.trackers:
+            return
+
         for t in self.trackers[player.id].copy():
             if (isinstance(tracker, str) and t.url == tracker) or (isinstance(tracker, TrackedGame) and t == tracker):
                 self.trackers[player.id].remove(t)
