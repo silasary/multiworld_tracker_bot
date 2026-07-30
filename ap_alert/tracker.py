@@ -746,6 +746,8 @@ class APTracker(Extension):
                 ),
             ),
         ]
+        if player_settings.quiet_mode:
+            components.append(Button(style=ButtonStyle.GREY, label="Quiet Mode: On", custom_id="quiet_mode:off", disabled=True))
         await ctx.send(components=components, ephemeral=True)
 
     async def sync_cheese(self, player: User, room: str | Multiworld) -> tuple[Multiworld, bool]:
