@@ -226,11 +226,19 @@ class APTracker(Extension):
             self.datapackages[tracker.game] = Datapackage(items={})
             await external_data.import_datapackage(tracker.game, self.datapackages[tracker.game])
 
+    refresh_global_cooldown = 0
+
     @ap.subcommand("refresh")
     async def ap_refresh(self, ctx: SlashContext) -> None:
+        """Debug command to refresh a user outside of the normal loop."""
         if not await self.get_trackers(ctx.author_id):
             await ctx.send(f"Track a game with {self.ap_track.mention()} first", ephemeral=True)
             return
+
+        if self.refresh_global_cooldown > datetime.datetime.now().timestamp():
+            await ctx.send("Refresh is currently in use, try again later.", ephemeral=True)
+            return
+        self.refresh_global_cooldown = datetime.datetime.now().timestamp() + 120
 
         ephemeral = await defer_ephemeral_if_guild(ctx)
 
@@ -242,7 +250,7 @@ class APTracker(Extension):
                 games[tracker] = tracker.notification_queue.copy()
             if tracker.failures >= 3:
                 await self.remove_tracker(ctx.author, tracker)
-                await ctx.send(f"Tracker {tracker.url} has been removed due to errors", ephemeral=ephemeral)
+                await ctx.author.send(f"Tracker {tracker.url} has been removed due to errors")
                 await self.save()
 
         if not games:
@@ -807,7 +815,8 @@ class APTracker(Extension):
 
         return multiworld, found_tracker
 
-    async def url_to_multiworld(self, room: str) -> tuple[str, Multiworld]:
+    async def url_to_multiworld(self, room: str | Multiworld) -> tuple[str, Multiworld]:
+        multiworld = None
         if isinstance(room, Multiworld):
             multiworld = room
             if multiworld.upstream_url is None:
@@ -819,7 +828,10 @@ class APTracker(Extension):
             ch_id = room.split("/")[-1]
             multiworld = Multiworld(f"https://cheesetrackers.theincrediblewheelofchee.se/api/tracker/{ch_id}")
             await multiworld.refresh()
-            room = multiworld.upstream_url
+            if multiworld.upstream_url is None:
+                logging.warning(f"Failed to get upstream URL for {room}")
+            else:
+                room = multiworld.upstream_url
 
         ap_url = None
         if "/tracker/" in room or "/generic_tracker/" in room:
@@ -901,6 +913,7 @@ class APTracker(Extension):
             try:
                 player = await self.bot.fetch_user(user.id)
                 if not player:
+                    task_logger.warning(f"Failed to fetch user {user.id} ({user.name})")
                     continue
 
                 user.update(player)
