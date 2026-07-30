@@ -233,7 +233,7 @@ class APTracker(Extension):
             if new_items:
                 games[tracker] = tracker.notification_queue.copy()
             if tracker.failures >= 3:
-                self.remove_tracker(ctx.author, tracker)
+                await self.remove_tracker(ctx.author, tracker)
                 await ctx.send(f"Tracker {tracker.url} has been removed due to errors", ephemeral=ephemeral)
                 await self.save()
 
@@ -531,7 +531,7 @@ class APTracker(Extension):
         tracker = next((t for t in await self.get_trackers(ctx.author_id) if t.cheese_id == int(m.group(1))), None)
         if tracker is None:
             return
-        self.remove_tracker(ctx.author_id, tracker)
+        await self.remove_tracker(ctx.author_id, tracker)
         await ctx.send("Tracker removed", ephemeral=True)
 
     @component_callback(regex_disable)
@@ -770,17 +770,22 @@ class APTracker(Extension):
 
                 if (game["checks_done"] == game["checks_total"] and game.completion_status == CompletionStatus.done) or game.completion_status == CompletionStatus.released:
                     # Removing needs an and, because 100% no goal can happen.
-                    self.remove_tracker(player, tracker.url)
-                    await player.send(f"Game {tracker.name} is complete")
+                    await self.remove_tracker(player, tracker)
+
+                    try:
+                        await player.send(f"Game {tracker.name} is complete")
+                    except Forbidden:
+                        print(f"Failed to send message to player {player} about completed game {tracker.name}")
+
                     continue
 
                 if is_mw_abandoned:
                     last_check = format_relative_time(multiworld.last_activity())
-                    self.remove_tracker(player, tracker.url)
+                    await self.remove_tracker(player, tracker)
                     await player.send(f"Game {tracker.name} has stalled, the last check in the multiworld was {last_check}. Removing tracker.")
                     continue
                 elif multiworld.goaled:
-                    self.remove_tracker(player, tracker.url)
+                    await self.remove_tracker(player, tracker)
                     await player.send(f"{multiworld.title} is complete, removing {tracker.name}")
                     continue
                 found_tracker = True
@@ -819,9 +824,11 @@ class APTracker(Extension):
 
         return room, multiworld
 
-    def remove_tracker(self, player: User | Member | Player | int, tracker: str | TrackedGame) -> None:
+    async def remove_tracker(self, player: User | Member | Player | int, tracker: TrackedGame) -> None:
         if isinstance(tracker, TrackedGame):
             tracker.disabled = True
+            if self.database:
+                await self.database.save_tracker(tracker)
 
         player_id = player.id if isinstance(player, (User, Member, Player)) else player
         if player_id not in self.trackers:
@@ -830,7 +837,7 @@ class APTracker(Extension):
         for t in self.trackers[player_id].copy():
             if (isinstance(tracker, str) and t.url == tracker) or (isinstance(tracker, TrackedGame) and t == tracker):
                 self.trackers[player_id].remove(t)
-            return
+                return
 
     def add_tracker(self, player_id: int, tracker: TrackedGame) -> None:
         if not tracker.url:
@@ -906,21 +913,15 @@ class APTracker(Extension):
                         tracker.user_id = user.id
                     try:
                         if tracker.failures >= 10:
-                            self.remove_tracker(player, tracker)
+                            await self.remove_tracker(player, tracker)
                             await player.send(f"Tracker {tracker.url} has been removed due to errors")
-                            if self.database:
-                                await self.database.save_tracker(tracker)
                             continue
 
                         if tracker.url in urls:
-                            self.remove_tracker(player, tracker)
-                            if self.database:
-                                await self.database.save_tracker(tracker)
+                            await self.remove_tracker(player, tracker)
                             continue
                         if tracker.cheese_id in ids:
-                            self.remove_tracker(player, tracker)
-                            if self.database:
-                                await self.database.save_tracker(tracker)
+                            await self.remove_tracker(player, tracker)
                             await self.save()
                             continue
                         urls.add(tracker.url)
@@ -934,7 +935,7 @@ class APTracker(Extension):
                         if multiworld is None:
                             tracker.failures += 1
                             if tracker.failures >= 3:
-                                self.remove_tracker(player, tracker.url)
+                                await self.remove_tracker(player, tracker)
                                 await player.send(f"Tracker {tracker.url} has been removed due to errors")
                             if self.database:
                                 await self.database.save_tracker(tracker)
@@ -963,7 +964,7 @@ class APTracker(Extension):
                         if not user.quiet_mode:
                             try:
                                 if not new_items and tracker.failures > 10:
-                                    self.remove_tracker(player, tracker.url)
+                                    await self.remove_tracker(player, tracker)
                                     await player.send(f"Tracker {tracker.url} has been removed due to errors")
                                     if self.database:
                                         await self.database.save_tracker(tracker)
