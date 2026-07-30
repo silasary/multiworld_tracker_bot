@@ -110,7 +110,13 @@ class APTracker(Extension):
                 all_trackers.extend(await self.database.fetch_trackers_for_user(discord_id))
             except Exception as e:
                 task_logger.error(f"Failed to fetch trackers for user {discord_id}: {e}")
-        all_trackers.extend(self.trackers.get(discord_id, []))
+        urls = set(t.url for t in all_trackers)
+        for tracker in self.trackers.get(discord_id, []):
+            if tracker.url not in urls:
+                all_trackers.append(tracker)
+                urls.add(tracker.url)
+            else:
+                self.trackers[discord_id].remove(tracker)
         return all_trackers
 
     @property
