@@ -819,16 +819,17 @@ class APTracker(Extension):
 
         return room, multiworld
 
-    def remove_tracker(self, player, tracker: str | TrackedGame) -> None:
+    def remove_tracker(self, player: User | Member | Player | int, tracker: str | TrackedGame) -> None:
         if isinstance(tracker, TrackedGame):
             tracker.disabled = True
 
-        if player.id not in self.trackers:
+        player_id = player.id if isinstance(player, (User, Member, Player)) else player
+        if player_id not in self.trackers:
             return
 
-        for t in self.trackers[player.id].copy():
+        for t in self.trackers[player_id].copy():
             if (isinstance(tracker, str) and t.url == tracker) or (isinstance(tracker, TrackedGame) and t == tracker):
-                self.trackers[player.id].remove(t)
+                self.trackers[player_id].remove(t)
             return
 
     def add_tracker(self, player_id: int, tracker: TrackedGame) -> None:
