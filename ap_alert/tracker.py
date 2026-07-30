@@ -174,6 +174,8 @@ class APTracker(Extension):
             await ctx.send("I can't send you DMs, please enable them so I can notify you when you get new items.", ephemeral=True)
             return
 
+        await self.get_player_settings(ctx.author_id)
+
         if "/room/" in url:
             await ctx.send("Please use the tracker URL, not the room URL", ephemeral=True)
             return
@@ -444,7 +446,7 @@ class APTracker(Extension):
             if f"dash:{tracker.cheese_id}" in used_ids:
                 logging.warning(f"Duplicate cheese_id {tracker.cheese_id}, skipping")
                 continue
-            used_ids.add(f"dash:{tracker.cheese_id}")
+
             if tracker.name is None:
                 tracker.name = f"{tracker.tracker_id} #{tracker.slot_id}"
             name = tracker.name.replace("*", "")
@@ -459,6 +461,8 @@ class APTracker(Extension):
                 tracker.cheese_id = min(trackers, key=lambda x: x.cheese_id or 0).cheese_id - 1
 
             buttons.append(Button(style=colour, label=name, custom_id=f"dash:{tracker.cheese_id}"))
+            used_ids.add(f"dash:{tracker.cheese_id}")
+
         buttons.sort(key=lambda x: x.style)
         pages = chunk(buttons, 25)
         for page in pages:
