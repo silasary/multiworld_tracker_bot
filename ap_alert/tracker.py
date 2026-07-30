@@ -431,9 +431,14 @@ class APTracker(Extension):
             return
 
         buttons: list[Button] = []
+        used_ids = set()
         for tracker in trackers:
             if tracker.disabled:
                 continue
+            if f"dash:{tracker.cheese_id}" in used_ids:
+                logging.warning(f"Duplicate cheese_id {tracker.cheese_id}, skipping")
+                continue
+            used_ids.add(f"dash:{tracker.cheese_id}")
             if tracker.name is None:
                 tracker.name = f"{tracker.tracker_id} #{tracker.slot_id}"
             name = tracker.name.replace("*", "")
