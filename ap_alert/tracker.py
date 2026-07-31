@@ -169,12 +169,16 @@ class APTracker(Extension):
         ephemeral = await defer_ephemeral_if_guild(ctx)
 
         try:
-            await ctx.author.fetch_dm()  # Make sure we can send DMs to this player
+            dm_channel = await ctx.author.fetch_dm()  # Make sure we can send DMs to this player
         except Forbidden:
             await ctx.send("I can't send you DMs, please enable them so I can notify you when you get new items.", ephemeral=True)
             return
 
-        await self.get_player_settings(ctx.author_id)
+        player_settings = await self.get_player_settings(ctx.author_id)
+        if player_settings.dm_channel_id != dm_channel.id:
+            player_settings.dm_channel_id = dm_channel.id
+            if self.database:
+                await self.database.save_player(player_settings)
 
         if "/room/" in url:
             await ctx.send("Please use the tracker URL, not the room URL", ephemeral=True)
@@ -909,7 +913,7 @@ class APTracker(Extension):
 
         random.shuffle(queue)
         for user in queue:
-            task_logger.debug(f"Processing user {user}")
+            task_logger.info(f"{task_id}: Processing user {user.name} ({user.id}) [{progress}/{len(queue)}]")
             trackers = await self.get_trackers(user.id)
 
             try:
@@ -1056,6 +1060,7 @@ class APTracker(Extension):
                         "current_user": user_count,
                         "total_users": len(queue),
                         "current_tracker_count": tracker_count,
+                        "stats_written": datetime.datetime.now(tz=datetime.UTC).isoformat(),
                     }
                     await self.save()
                     progress = 0

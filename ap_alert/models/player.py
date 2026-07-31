@@ -18,6 +18,7 @@ class Player:
     default_filters: Filters = Filters.unset
     default_hint_filters: HintFilters = HintFilters.unset
     quiet_mode: bool = False
+    dm_channel_id: int | None = None
 
     @property
     def mention(self) -> str:
