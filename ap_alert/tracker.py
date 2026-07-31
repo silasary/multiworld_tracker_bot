@@ -883,7 +883,7 @@ class APTracker(Extension):
         if self.database:
             await self.database.save_player(player)
 
-    @Task.create(IntervalTrigger(hours=3))
+    @Task.create(IntervalTrigger(hours=4))
     async def refresh_all(self) -> BaseTrigger | None:
         task_id = self.refresh_all.iteration
         start_time = datetime.datetime.now(tz=datetime.UTC)
@@ -1061,7 +1061,7 @@ class APTracker(Extension):
                     progress = 0
             except Exception as e:
                 sentry_sdk.capture_exception(e)
-                logging.error(f"Failed to refresh trackers for {user}")
+                task_logger.error(f"Failed to refresh trackers for {user}")
                 print(e)
                 await asyncio.sleep(5)
 
@@ -1099,7 +1099,7 @@ class APTracker(Extension):
         task_logger.info(f"Completed refresh_all task {task_id}: {tracker_count} trackers for {user_count} users in {time_taken}")
         trigger = self.refresh_all.trigger
 
-        hours = int(max(1, tracker_count // 3600 + 1))
+        hours = int(max(1, tracker_count // 1800 + 1))
         if isinstance(trigger, IntervalTrigger) and int(trigger.delta.total_seconds() // 3600) != hours:
             task_logger.info(f"Adjusted refresh_all interval to {hours} hours")
             self.refresh_all.trigger = IntervalTrigger(hours=hours)
