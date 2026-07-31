@@ -252,6 +252,8 @@ class APTracker(Extension):
             new_items = await multiworld.refresh_game(tracker)
             if new_items:
                 games[tracker] = tracker.notification_queue.copy()
+            if self.database:
+                await self.database.save_tracker(tracker)
             if tracker.failures >= 3:
                 await self.remove_tracker(ctx.author, tracker)
                 await ctx.author.send(f"Tracker {tracker.url} has been removed due to errors")
@@ -264,6 +266,8 @@ class APTracker(Extension):
         n = 0
         for tracker, items in games.items():
             await self.send_new_items(ctx, tracker, ephemeral=ephemeral)
+            if self.database:
+                await self.database.save_tracker(tracker)
             n += 1
             if n > 3 and isinstance(ctx, InteractionContext):
                 ctx = ctx.author
