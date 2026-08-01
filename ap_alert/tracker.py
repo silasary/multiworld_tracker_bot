@@ -809,6 +809,8 @@ class APTracker(Extension):
                         await player.send(f"Game {tracker.name} is complete")
                     except Forbidden:
                         print(f"Failed to send message to player {player} about completed game {tracker.name}")
+                        settings = await self.get_player_settings(player.id)
+                        await self.set_quiet_mode(settings, True)
 
                     continue
 
