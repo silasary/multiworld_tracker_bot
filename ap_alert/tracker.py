@@ -916,8 +916,8 @@ class APTracker(Extension):
             queue = [await self.get_player_settings(p) for p in self.get_all_players()]
 
         random.shuffle(queue)
-        for user in queue:
-            task_logger.info(f"{task_id}: Processing user {user.name} ({user.id}) [{progress}/{len(queue)}]")
+        for i, user in enumerate(queue):
+            task_logger.info(f"{task_id}: Processing user {user.name} ({user.id}) [{i}/{len(queue)}]")
             trackers = await self.get_trackers(user.id)
 
             try:
@@ -926,7 +926,10 @@ class APTracker(Extension):
                     task_logger.warning(f"Failed to fetch user {user.id} ({user.name})")
                     continue
 
+                old_name = user.name
                 user.update(player)
+                if old_name != user.name and self.database:
+                    await self.database.save_player(user)
 
                 if user.cheese_api_key:
                     try:
