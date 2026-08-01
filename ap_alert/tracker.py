@@ -142,7 +142,7 @@ class APTracker(Extension):
             for tracker in trackers:
                 await self.check_for_dp(tracker)
         self.refresh_all.start()
-        external_data.update_datapackage.start()
+        # external_data.update_datapackage.start()
         await external_data.update_datapackage()
         activity = Activity(name=f"{self.tracker_count} slots across {self.user_count} users", type=ActivityType.WATCHING)
         await self.bot.change_presence(activity=activity)
