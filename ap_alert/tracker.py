@@ -811,7 +811,8 @@ class APTracker(Extension):
                         print(f"Failed to send message to player {player} about completed game {tracker.name}")
                         settings = await self.get_player_settings(player.id)
                         await self.set_quiet_mode(settings, True)
-
+                    if self.database:
+                        await self.database.save_tracker(tracker)
                     continue
 
                 if is_mw_abandoned:
